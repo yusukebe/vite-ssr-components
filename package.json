@@ -18,10 +18,6 @@
     "dist"
   ],
   "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
-    },
     "./common": {
       "types": "./dist/common/index.d.ts",
       "import": "./dist/common/index.js"
