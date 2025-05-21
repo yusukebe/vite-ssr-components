@@ -6,6 +6,10 @@
     "test": "vitest",
     "build": "tsup",
     "watch": "tsup --watch",
+    "lint": "eslint 'src/**/*.{ts,tsx}'",
+    "lint:fix": "eslint --fix 'src/**/*.{ts,tsx}'",
+    "format": "prettier --check 'src/**/*.{ts,tsx}'",
+    "format:fix": "prettier --write 'src/**/*.{ts,tsx}'",
     "publint": "publint",
     "prerelease": "bun run build && bun vitest --run",
     "release": "bun run np"
@@ -34,6 +38,7 @@
     "@types/node": "^22.15.21",
     "eslint": "^9.27.0",
     "np": "^10.2.0",
+    "prettier": "^3.5.3",
     "publint": "^0.3.12",
     "tsup": "^8.5.0",
     "vite": "^6.3.5",
