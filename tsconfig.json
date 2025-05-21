@@ -12,9 +12,11 @@
       "@types/node",
       "vite/client",
       "vitest/globals"
-    ]
+    ],
+    "jsx": "preserve",
   },
   "include": [
-    "**/*.ts"
+    "**/*.ts",
+    "**/*.tsx"
   ]
 }

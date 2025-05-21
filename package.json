@@ -21,6 +21,18 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./common": {
+      "types": "./dist/common/index.d.ts",
+      "import": "./dist/common/index.js"
+    },
+    "./react": {
+      "types": "./dist/react/index.d.ts",
+      "import": "./dist/react/index.js"
+    },
+    "./hono": {
+      "types": "./dist/hono/index.d.ts",
+      "import": "./dist/hono/index.js"
     }
   },
   "author": "Yusuke Wada <yusuke@kamawada.com> (https://github.com/yusukebe)",
@@ -36,10 +48,15 @@
   "devDependencies": {
     "@hono/eslint-config": "^2.0.1",
     "@types/node": "^22.15.21",
+    "@types/react": "^19.1.4",
+    "@types/react-dom": "^19.1.5",
     "eslint": "^9.27.0",
+    "hono": "^4.7.10",
     "np": "^10.2.0",
     "prettier": "^3.5.3",
     "publint": "^0.3.12",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
     "tsup": "^8.5.0",
     "vite": "^6.3.5",
     "vitest": "^3.1.4"
