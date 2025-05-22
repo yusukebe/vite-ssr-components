@@ -1,12 +1,12 @@
 /** @jsxImportSource hono/jsx */
 /** @jsxRuntime automatic */
-
 import type { JSX } from 'hono/jsx'
-import { getHrefFromManifest, GetHrefOptions } from '../common/link.js'
-import { StringLiteralUnion } from 'hono/utils/types'
-import { BaseMime } from 'hono/utils/mime'
+import type { BaseMime } from 'hono/utils/mime'
+import type { StringLiteralUnion } from 'hono/utils/types'
+import type { GetHrefOptions } from '../common/link.js'
+import { getHrefFromManifest } from '../common/link.js'
 
-export const Link = (props: GetHrefOptions<LinkHTMLAttributes>) => {
+export const Link = (props: GetHrefOptions & Omit<LinkHTMLAttributes, 'href'>) => {
   const { manifest, prod, baseUrl, ...rest } = props
   const href = getHrefFromManifest({ href: props.href, prod, manifest, baseUrl })
   return <link {...rest} href={href} />

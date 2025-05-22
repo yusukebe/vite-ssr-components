@@ -1,15 +1,14 @@
 import type { Manifest } from 'vite'
 import { ensureTrailingSlash } from '../utils/path.js'
 
-export interface GetHrefOptions {
-  href: string
-  manifest?: Manifest
+export interface GetSrcOptions {
+  src: string
   prod?: boolean
+  manifest?: Manifest
   baseUrl?: string
 }
 
-export const getHrefFromManifest = ({ href, manifest, prod, baseUrl = '/' }: GetHrefOptions) => {
-  if (!href) return undefined
+export const getSrcFromManifest = ({ src, prod, manifest, baseUrl = '/' }: GetSrcOptions) => {
   if (prod ?? import.meta.env.PROD) {
     if (!manifest) {
       const MANIFEST = import.meta.glob<{ default: Manifest }>('/dist/.vite/manifest.json', {
@@ -22,13 +21,11 @@ export const getHrefFromManifest = ({ href, manifest, prod, baseUrl = '/' }: Get
     }
 
     if (manifest) {
-      const assetInManifest = manifest[href.replace(/^\//, '')]
-      return href.startsWith('/')
-        ? `${ensureTrailingSlash(baseUrl)}${assetInManifest.file}`
-        : assetInManifest.file
+      const scriptInManifest = manifest[src.replace(/^\//, '')]
+      return `${ensureTrailingSlash(baseUrl)}${scriptInManifest.file}`
     }
     return undefined
   } else {
-    return href
+    return src
   }
 }
