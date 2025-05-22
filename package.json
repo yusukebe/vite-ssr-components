@@ -29,6 +29,10 @@
     "./hono": {
       "types": "./dist/hono/index.d.ts",
       "import": "./dist/hono/index.js"
+    },
+    "./plugin/hot-reload": {
+      "types": "./dist/plugin/hot-reload.d.ts",
+      "import": "./dist/plugin/hot-reload.js"
     }
   },
   "author": "Yusuke Wada <yusuke@kamawada.com> (https://github.com/yusukebe)",
@@ -44,6 +48,7 @@
   "devDependencies": {
     "@hono/eslint-config": "^2.0.1",
     "@types/node": "^22.15.21",
+    "@types/picomatch": "^4.0.0",
     "@types/react": "^19.1.4",
     "@types/react-dom": "^19.1.5",
     "eslint": "^9.27.0",
@@ -59,5 +64,8 @@
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "picomatch": "^4.0.2"
   }
 }
