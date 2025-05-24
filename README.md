@@ -20,7 +20,7 @@ This library solves these issues by providing:
 ## Install
 
 ```bash
-npm i vite-ssr-components
+npm i -D vite-ssr-components
 ```
 
 ## Components
