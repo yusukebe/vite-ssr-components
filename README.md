@@ -16,7 +16,7 @@ This library solves these issues by providing:
 - **Automatic Vite client injection** for development mode
 - **SSR hot reload** plugin for seamless development experience
 - **Automatic asset path resolution** using Vite's manifest.json
-- **Automatic build entry detection** from Script/Link components
+- **Automatic build entry detection** from Script/Link components with flexible component-attribute mapping
 - **Framework agnostic** components for both hono/jsx and React
 
 ## Install
@@ -195,10 +195,15 @@ export default defineConfig({
 #### Options
 
 ```ts
+interface ComponentConfig {
+  name: string // Component name to detect
+  attribute: string // Attribute name to extract file path from
+}
+
 interface SSRPluginOptions {
   buildAssets?: {
     entryFile?: string // Entry file to scan (default: 'src/index.tsx')
-    componentNames?: string[] // Component names to detect (default: ['Script', 'Link'])
+    components?: ComponentConfig[] // Component configurations (default: [{ name: 'Script', attribute: 'src' }, { name: 'Link', attribute: 'href' }])
   }
   hotReload?:
     | boolean
@@ -217,13 +222,21 @@ export default defineConfig({
   plugins: [ssrPlugin()],
 })
 
-// Custom configuration
+// Custom component configurations
 export default defineConfig({
   plugins: [
     ssrPlugin({
       buildAssets: {
         entryFile: 'src/server.tsx',
-        componentNames: ['CustomScript', 'CustomLink'],
+        components: [
+          { name: 'Script', attribute: 'src' },
+          { name: 'Link', attribute: 'href' },
+          { name: 'CustomScript', attribute: 'source' },
+          { name: 'CustomLink', attribute: 'url' },
+          { name: 'Foo', attribute: 'hoge' },
+          { name: 'DataLoader', attribute: 'dataPath' },
+          { name: 'AssetLoader', attribute: 'assetUrl' },
+        ],
       },
       hotReload: {
         entry: ['src/**/*.ts', 'src/**/*.tsx'],
@@ -241,6 +254,42 @@ export default defineConfig({
     }),
   ],
 })
+```
+
+#### Custom Component Detection
+
+The plugin can detect any custom components with any attribute names:
+
+```tsx
+// Custom components in your SSR code
+function App() {
+  return (
+    <html>
+      <head>
+        <CustomScript source='/src/app.js' />
+        <CustomLink url='/src/main.css' />
+        <Foo hoge='/src/data.json' />
+        <DataLoader dataPath='/src/config.json' />
+        <AssetLoader assetUrl='/src/assets/image.png' />
+      </head>
+    </html>
+  )
+}
+```
+
+The plugin will automatically:
+
+- Detect `CustomScript` components and extract paths from the `source` attribute
+- Detect `CustomLink` components and extract paths from the `url` attribute
+- Detect `Foo` components and extract paths from the `hoge` attribute
+- And so on...
+
+Each component type only looks for its specified attribute, ensuring accurate detection:
+
+```tsx
+// Only the correct attributes are detected for each component
+<Script href="/src/wrong.css" src="/src/client.tsx" />  // Only 'src' is detected
+<Link src="/src/wrong.js" href="/src/style.css" />     // Only 'href' is detected
 ```
 
 ## Examples

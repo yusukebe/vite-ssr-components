@@ -70,6 +70,56 @@ describe('autoEntry plugin', () => {
     ])
   })
 
+  it('should handle custom component configurations', async () => {
+    const mockFileContent = `
+      import { CustomScript, CustomLink, Foo } from 'ssr-components'
+      export default function App() {
+        return (
+          <html>
+            <head>
+              <CustomScript source="/src/app.js" />
+              <CustomLink url="/src/main.css" rel="stylesheet" />
+              <Foo hoge="/src/data.json" />
+            </head>
+          </html>
+        )
+      }
+    `
+
+    const { existsSync, readFileSync } = await import('node:fs')
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    const { resolve } = await import('node:path')
+
+    vi.mocked(existsSync).mockReturnValue(true)
+    vi.mocked(readFileSync).mockReturnValue(mockFileContent)
+    vi.mocked(resolve).mockReturnValue('/mock/project/src/index.tsx')
+
+    const plugin = autoEntry({
+      components: [
+        { name: 'CustomScript', attribute: 'source' },
+        { name: 'CustomLink', attribute: 'url' },
+        { name: 'Foo', attribute: 'hoge' },
+      ],
+    })
+    const mockConfig = {
+      root: '/mock/project',
+      build: { ssr: false },
+      environments: {},
+    }
+
+    if (plugin.configResolved) {
+      // @ts-expect-error - Testing plugin behavior with mock config
+      plugin.configResolved(mockConfig)
+    }
+
+    // @ts-expect-error - Dynamic properties created by plugin
+    expect(mockConfig.environments.client.build.rollupOptions.input).toEqual([
+      '/src/app.js',
+      '/src/main.css',
+      '/src/data.json',
+    ])
+  })
+
   it('should handle JSX expressions gracefully', async () => {
     const mockFileContent = `
       import { Script, Link } from 'ssr-components'
@@ -111,17 +161,15 @@ describe('autoEntry plugin', () => {
     expect(mockConfig.environments.client.build.rollupOptions.input).toEqual(['/src/style.css'])
   })
 
-  it('should handle commented code correctly', async () => {
+  it('should only detect specified attributes for each component', async () => {
     const mockFileContent = `
       import { Script, Link } from 'ssr-components'
       export default function App() {
         return (
           <html>
             <head>
-              {/* <Script src="/src/commented.tsx" /> */}
-              <Script src="/src/client.tsx" />
-              // <Link href="/src/commented.css" rel="stylesheet" />
-              <Link href="/src/style.css" rel="stylesheet" />
+              <Script href="/src/wrong.css" src="/src/client.tsx" />
+              <Link src="/src/wrong.js" href="/src/style.css" rel="stylesheet" />
             </head>
           </html>
         )
@@ -148,11 +196,10 @@ describe('autoEntry plugin', () => {
       plugin.configResolved(mockConfig)
     }
 
-    // AST correctly ignores JSX comments but may detect line comments
+    // Should only detect src for Script and href for Link
     // @ts-expect-error - Dynamic properties created by plugin
     expect(mockConfig.environments.client.build.rollupOptions.input).toEqual([
       '/src/client.tsx',
-      '/src/commented.css',
       '/src/style.css',
     ])
   })

@@ -2,10 +2,15 @@ import type { Plugin } from 'vite'
 import { autoEntry } from './auto-entry.js'
 import hotReload from './hot-reload.js'
 
+interface ComponentConfig {
+  name: string
+  attribute: string
+}
+
 interface SSRPluginOptions {
   buildAssets?: {
     entryFile?: string
-    componentNames?: string[]
+    components?: ComponentConfig[]
   }
   hotReload?:
     | boolean

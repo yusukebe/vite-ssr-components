@@ -1,6 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unnecessary-condition */
 import { parse } from '@babel/parser'
 import traverse from '@babel/traverse'
 import type { JSXElement, StringLiteral } from '@babel/types'
@@ -8,13 +5,24 @@ import type { Plugin } from 'vite'
 import fs from 'node:fs'
 import path from 'node:path'
 
+interface ComponentConfig {
+  name: string
+  attribute: string
+}
+
 interface AutoEntryOptions {
   entryFile?: string
-  componentNames?: string[]
+  components?: ComponentConfig[]
 }
 
 export function autoEntry(options: AutoEntryOptions = {}): Plugin {
-  const { entryFile = 'src/index.tsx', componentNames = ['Script', 'Link'] } = options
+  const {
+    entryFile = 'src/index.tsx',
+    components = [
+      { name: 'Script', attribute: 'src' },
+      { name: 'Link', attribute: 'href' },
+    ],
+  } = options
 
   return {
     name: 'ssr-auto-entry',
@@ -33,9 +41,10 @@ export function autoEntry(options: AutoEntryOptions = {}): Plugin {
 
       if (fs.existsSync(entryPath)) {
         const content = fs.readFileSync(entryPath, 'utf-8')
-        const detectedEntries = extractEntriesFromAST(content, componentNames)
+        const detectedEntries = extractEntriesFromAST(content, components)
 
         if (detectedEntries.length > 0) {
+          // @ts-expect-error - Dynamic configuration modification for environments
           const configAny = config
 
           if (!configAny.environments) {
@@ -81,13 +90,19 @@ export function autoEntry(options: AutoEntryOptions = {}): Plugin {
   }
 }
 
-function extractEntriesFromAST(code: string, componentNames: string[]): string[] {
+function extractEntriesFromAST(code: string, components: ComponentConfig[]): string[] {
   const entries: string[] = []
 
   // Parse the code into an AST
   const ast = parse(code, {
     sourceType: 'module',
     plugins: ['jsx', 'typescript'],
+  })
+
+  // Create a map for quick lookup
+  const componentMap = new Map<string, string>()
+  components.forEach((comp) => {
+    componentMap.set(comp.name, comp.attribute)
   })
 
   // Traverse the AST to find JSX elements
@@ -99,14 +114,16 @@ function extractEntriesFromAST(code: string, componentNames: string[]): string[]
       // Check if this is one of our target components
       if (
         openingElement.name.type === 'JSXIdentifier' &&
-        componentNames.includes(openingElement.name.name)
+        componentMap.has(openingElement.name.name)
       ) {
-        // Look for src or href attributes
+        const targetAttribute = componentMap.get(openingElement.name.name)!
+
+        // Look for the specific attribute for this component
         for (const attr of openingElement.attributes) {
           if (
             attr.type === 'JSXAttribute' &&
             attr.name.type === 'JSXIdentifier' &&
-            (attr.name.name === 'src' || attr.name.name === 'href') &&
+            attr.name.name === targetAttribute &&
             attr.value?.type === 'StringLiteral'
           ) {
             const value = (attr.value as StringLiteral).value
