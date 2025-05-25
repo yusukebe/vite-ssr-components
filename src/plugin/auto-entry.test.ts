@@ -131,7 +131,6 @@ describe('autoEntry plugin', () => {
     }
 
     // @ts-expect-error - Dynamic properties created by plugin
-
     expect(mockConfig.environments.client.build.rollupOptions.input).toEqual([
       '/src/app.js',
       '/src/main.css',
@@ -253,5 +252,47 @@ describe('autoEntry plugin', () => {
 
     // @ts-expect-error - Dynamic properties created by plugin
     expect(mockConfig.environments.client.build.rollupOptions.input).toEqual(['/src/client.tsx'])
+  })
+
+  it('should handle attributes in different order', async () => {
+    const mockFileContent = `
+      import { Script, Link } from 'ssr-components'
+      export default function App() {
+        return (
+          <html>
+            <head>
+              <Link foo="bar" href="/src/style.css" rel="stylesheet" />
+              <Script type="module" src="/src/client.tsx" defer />
+            </head>
+          </html>
+        )
+      }
+    `
+
+    const { existsSync, readFileSync } = await import('node:fs')
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    const { resolve } = await import('node:path')
+
+    vi.mocked(existsSync).mockReturnValue(true)
+    vi.mocked(readFileSync).mockReturnValue(mockFileContent)
+    vi.mocked(resolve).mockReturnValue('/mock/project/src/index.tsx')
+
+    const plugin = autoEntry()
+    const mockConfig = {
+      root: '/mock/project',
+      build: { ssr: false },
+      environments: {},
+    }
+
+    if (plugin.configResolved) {
+      // @ts-expect-error - Testing plugin behavior with mock config
+      plugin.configResolved(mockConfig)
+    }
+
+    // @ts-expect-error - Dynamic properties created by plugin
+    expect(mockConfig.environments.client.build.rollupOptions.input).toEqual([
+      '/src/client.tsx',
+      '/src/style.css',
+    ])
   })
 })
