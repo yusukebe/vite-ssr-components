@@ -179,32 +179,21 @@ examples/hono/
 ```ts
 import { defineConfig } from 'vite'
 import { cloudflare } from '@cloudflare/vite-plugin'
-import build from '@hono/vite-build/cloudflare-workers'
 import ssrHotReload from 'vite-ssr-components/plugin/hot-reload'
 
-export default defineConfig(({ mode, command }) => {
-  if (command === 'build') {
-    if (mode === 'client') {
-      return {
-        build: {
-          manifest: true,
-          rollupOptions: {
-            input: ['./src/client.tsx', './src/style.css'],
-          },
+export default defineConfig({
+  plugins: [cloudflare(), ssrHotReload()],
+  environments: {
+    client: {
+      build: {
+        outDir: 'dist/client',
+        manifest: true,
+        rollupOptions: {
+          input: ['./src/client.tsx', './src/style.css'],
         },
-      }
-    }
-    return {
-      plugins: [
-        build({
-          outputDir: 'dist-server',
-        }),
-      ],
-    }
-  }
-  return {
-    plugins: [cloudflare(), ssrHotReload()],
-  }
+      },
+    },
+  },
 })
 ```
 
@@ -253,44 +242,28 @@ examples/react/
 ```ts
 import { defineConfig } from 'vite'
 import { cloudflare } from '@cloudflare/vite-plugin'
-import build from '@hono/vite-build/cloudflare-workers'
 import react from '@vitejs/plugin-react'
 import ssrHotReload from 'vite-ssr-components/plugin/hot-reload'
 
-export default defineConfig(({ mode, command }) => {
-  if (command === 'build') {
-    if (mode === 'client') {
-      return {
-        build: {
-          manifest: true,
-          rollupOptions: {
-            input: ['./src/client/index.tsx', './src/style.css'],
-          },
-        },
-      }
-    }
-    return {
-      resolve: {
-        alias: {
-          'react-dom/server': 'react-dom/server.edge',
+export default defineConfig({
+  plugins: [
+    cloudflare(),
+    ssrHotReload({
+      ignore: ['./src/client/**/*.tsx'],
+    }),
+    react(),
+  ],
+  environments: {
+    client: {
+      build: {
+        outDir: 'dist/client',
+        manifest: true,
+        rollupOptions: {
+          input: ['./src/client/index.tsx', './src/style.css'],
         },
       },
-      plugins: [
-        build({
-          outputDir: 'dist-server',
-        }),
-      ],
-    }
-  }
-  return {
-    plugins: [
-      cloudflare(),
-      ssrHotReload({
-        ignore: ['./src/client/**/*.tsx'],
-      }),
-      react(),
-    ],
-  }
+    },
+  },
 })
 ```
 
@@ -304,6 +277,7 @@ import { renderToReadableStream } from 'react-dom/server'
 const app = new Hono()
 
 app.get('/', async (c) => {
+  c.header('Content-Type', 'text/html')
   return c.body(
     await renderToReadableStream(
       <html>
