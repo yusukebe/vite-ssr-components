@@ -1,4 +1,9 @@
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unnecessary-condition */
+import { parse } from '@babel/parser'
+import traverse from '@babel/traverse'
+import type { JSXElement, StringLiteral } from '@babel/types'
 import type { Plugin } from 'vite'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -28,7 +33,7 @@ export function autoEntry(options: AutoEntryOptions = {}): Plugin {
 
       if (fs.existsSync(entryPath)) {
         const content = fs.readFileSync(entryPath, 'utf-8')
-        const detectedEntries = extractEntriesFromCode(content, componentNames)
+        const detectedEntries = extractEntriesFromAST(content, componentNames)
 
         if (detectedEntries.length > 0) {
           const configAny = config
@@ -76,23 +81,42 @@ export function autoEntry(options: AutoEntryOptions = {}): Plugin {
   }
 }
 
-function extractEntriesFromCode(code: string, componentNames: string[]): string[] {
+function extractEntriesFromAST(code: string, componentNames: string[]): string[] {
   const entries: string[] = []
 
-  componentNames.forEach((componentName) => {
-    const srcPattern = new RegExp(
-      `<${componentName}[^>]*\\s(?:src|href)=['"]([^'"]+)['"][^>]*/?>`,
-      'g'
-    )
+  // Parse the code into an AST
+  const ast = parse(code, {
+    sourceType: 'module',
+    plugins: ['jsx', 'typescript'],
+  })
 
-    let match
-    while ((match = srcPattern.exec(code)) !== null) {
-      const srcValue = match[1]
-      if (srcValue) {
-        // Use path as-is without conversion
-        entries.push(srcValue)
+  // Traverse the AST to find JSX elements
+  traverse(ast, {
+    JSXElement(path) {
+      const element = path.node as JSXElement
+      const openingElement = element.openingElement
+
+      // Check if this is one of our target components
+      if (
+        openingElement.name.type === 'JSXIdentifier' &&
+        componentNames.includes(openingElement.name.name)
+      ) {
+        // Look for src or href attributes
+        for (const attr of openingElement.attributes) {
+          if (
+            attr.type === 'JSXAttribute' &&
+            attr.name.type === 'JSXIdentifier' &&
+            (attr.name.name === 'src' || attr.name.name === 'href') &&
+            attr.value?.type === 'StringLiteral'
+          ) {
+            const value = (attr.value as StringLiteral).value
+            if (value) {
+              entries.push(value)
+            }
+          }
+        }
       }
-    }
+    },
   })
 
   return [...new Set(entries)]
