@@ -1,4 +1,5 @@
 import type { Manifest } from 'vite'
+import { loadManifest } from '../utils/manifest.js'
 import { ensureTrailingSlash } from '../utils/path.js'
 
 export interface GetSrcOptions {
@@ -10,15 +11,7 @@ export interface GetSrcOptions {
 
 export const getSrcFromManifest = ({ src, prod, manifest, baseUrl = '/' }: GetSrcOptions) => {
   if (prod ?? import.meta.env.PROD) {
-    if (!manifest) {
-      const MANIFEST = import.meta.glob<{ default: Manifest }>('/dist/.vite/manifest.json', {
-        eager: true,
-      })
-      for (const [, manifestFile] of Object.entries(MANIFEST)) {
-        manifest = manifestFile.default
-        break
-      }
-    }
+    manifest ??= loadManifest()
 
     if (manifest) {
       const scriptInManifest = manifest[src.replace(/^\//, '')]
