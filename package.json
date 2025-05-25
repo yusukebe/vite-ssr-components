@@ -30,9 +30,9 @@
       "types": "./dist/hono/index.d.ts",
       "import": "./dist/hono/index.js"
     },
-    "./plugin/hot-reload": {
-      "types": "./dist/plugin/hot-reload.d.ts",
-      "import": "./dist/plugin/hot-reload.js"
+    "./plugin": {
+      "types": "./dist/plugin/index.d.ts",
+      "import": "./dist/plugin/index.js"
     }
   },
   "author": "Yusuke Wada <yusuke@kamawada.com> (https://github.com/yusukebe)",

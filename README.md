@@ -9,12 +9,14 @@ When using Cloudflare's Vite plugin for SSR applications, several challenges ari
 - **Missing Vite client scripts**: The Vite client script (`/@vite/client`) is not automatically embedded in server-side rendered HTML
 - **No SSR hot reload**: Server-side code changes don't trigger hot reloads during development
 - **Complex asset path resolution**: Resolving script and asset paths after build requires manual manifest.json handling
+- **Manual build configuration**: Manually specifying entry files in `vite.config.ts` for each Script/Link component
 
 This library solves these issues by providing:
 
 - **Automatic Vite client injection** for development mode
 - **SSR hot reload** plugin for seamless development experience
 - **Automatic asset path resolution** using Vite's manifest.json
+- **Automatic build entry detection** from Script/Link components
 - **Framework agnostic** components for both hono/jsx and React
 
 ## Install
@@ -22,6 +24,50 @@ This library solves these issues by providing:
 ```bash
 npm i -D vite-ssr-components
 ```
+
+## Quick Start
+
+### 1. Add the SSR Plugin
+
+```ts
+// vite.config.ts
+import { defineConfig } from 'vite'
+import { cloudflare } from '@cloudflare/vite-plugin'
+import ssrPlugin from 'vite-ssr-components/plugin'
+
+export default defineConfig({
+  plugins: [cloudflare(), ssrPlugin()],
+})
+```
+
+### 2. Use Components in Your SSR Code
+
+```tsx
+import { Script, Link, ViteClient } from 'vite-ssr-components/hono'
+// import { Script, Link, ViteClient } from 'vite-ssr-components/react'
+
+function App() {
+  return (
+    <html>
+      <head>
+        <ViteClient />
+        <Script src='/src/client.tsx' />
+        <Link href='/src/style.css' rel='stylesheet' />
+      </head>
+      <body>
+        <div id='root' />
+      </body>
+    </html>
+  )
+}
+```
+
+That's it! The plugin automatically:
+
+- Detects Script/Link components in your SSR code
+- Adds the referenced files to Vite's build input
+- Configures client build settings
+- Enables SSR hot reload
 
 ## Components
 
@@ -132,29 +178,70 @@ function App() {
 
 ## Plugins
 
-### SSR Hot Reload
+### SSR Plugin
 
-Vite plugin for SSR hot reload functionality.
+The main plugin that combines auto-entry detection and SSR hot reload functionality.
 
 ```ts
 // vite.config.ts
 import { defineConfig } from 'vite'
-import ssrHotReload from 'vite-ssr-components/plugin/hot-reload'
+import ssrPlugin from 'vite-ssr-components/plugin'
 
 export default defineConfig({
-  plugins: [
-    ssrHotReload({
-      entry: ['src/**/*.ts', 'src/**/*.tsx'],
-      ignore: ['src/client/**/*'],
-    }),
-  ],
+  plugins: [ssrPlugin()],
 })
 ```
 
 #### Options
 
-- `entry`: File patterns to watch for SSR hot reload (defaults to `['src/**/*.ts', 'src/**/*.tsx']`)
-- `ignore`: File patterns to ignore (optional)
+```ts
+interface SSRPluginOptions {
+  buildAssets?: {
+    entryFile?: string // Entry file to scan (default: 'src/index.tsx')
+    componentNames?: string[] // Component names to detect (default: ['Script', 'Link'])
+  }
+  hotReload?:
+    | boolean
+    | {
+        entry?: string | string[] // File patterns to watch (default: ['src/**/*.ts', 'src/**/*.tsx'])
+        ignore?: string | string[] // File patterns to ignore
+      }
+}
+```
+
+#### Examples
+
+```ts
+// Basic usage
+export default defineConfig({
+  plugins: [ssrPlugin()],
+})
+
+// Custom configuration
+export default defineConfig({
+  plugins: [
+    ssrPlugin({
+      buildAssets: {
+        entryFile: 'src/server.tsx',
+        componentNames: ['CustomScript', 'CustomLink'],
+      },
+      hotReload: {
+        entry: ['src/**/*.ts', 'src/**/*.tsx'],
+        ignore: ['src/client/**/*'],
+      },
+    }),
+  ],
+})
+
+// Disable hot reload
+export default defineConfig({
+  plugins: [
+    ssrPlugin({
+      hotReload: false,
+    }),
+  ],
+})
+```
 
 ## Examples
 
@@ -179,21 +266,10 @@ examples/hono/
 ```ts
 import { defineConfig } from 'vite'
 import { cloudflare } from '@cloudflare/vite-plugin'
-import ssrHotReload from 'vite-ssr-components/plugin/hot-reload'
+import ssrPlugin from 'vite-ssr-components/plugin'
 
 export default defineConfig({
-  plugins: [cloudflare(), ssrHotReload()],
-  environments: {
-    client: {
-      build: {
-        outDir: 'dist/client',
-        manifest: true,
-        rollupOptions: {
-          input: ['./src/client.tsx', './src/style.css'],
-        },
-      },
-    },
-  },
+  plugins: [cloudflare(), ssrPlugin()],
 })
 ```
 
@@ -243,27 +319,18 @@ examples/react/
 import { defineConfig } from 'vite'
 import { cloudflare } from '@cloudflare/vite-plugin'
 import react from '@vitejs/plugin-react'
-import ssrHotReload from 'vite-ssr-components/plugin/hot-reload'
+import ssrPlugin from 'vite-ssr-components/plugin'
 
 export default defineConfig({
   plugins: [
     cloudflare(),
-    ssrHotReload({
-      ignore: ['./src/client/**/*.tsx'],
+    ssrPlugin({
+      hotReload: {
+        ignore: ['./src/client/**/*.tsx'],
+      },
     }),
     react(),
   ],
-  environments: {
-    client: {
-      build: {
-        outDir: 'dist/client',
-        manifest: true,
-        rollupOptions: {
-          input: ['./src/client/index.tsx', './src/style.css'],
-        },
-      },
-    },
-  },
 })
 ```
 
