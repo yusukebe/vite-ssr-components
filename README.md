@@ -6,16 +6,16 @@
 
 When using Cloudflare's Vite plugin for SSR applications, several challenges arise:
 
-- **Missing Vite client scripts**: The Vite client script (`/@vite/client`) is not automatically embedded in server-side rendered HTML
+- **Missing Vite client scripts**: The Vite client script (`/@vite/client`) needs to be manually embedded in server-side rendered HTML
 - **No SSR hot reload**: Server-side code changes don't trigger hot reloads during development
-- **Complex asset path resolution**: Resolving script and asset paths after build requires manual manifest.json handling
+- **Complex asset path resolution**: Resolving script and asset paths after build requires manual `manifest.json` handling
 - **Manual build configuration**: Manually specifying entry files in `vite.config.ts` for each Script/Link component
 
 This library solves these issues by providing:
 
-- **Automatic Vite client injection** for development mode
+- **ViteClient component** for development mode
 - **SSR hot reload** plugin for seamless development experience
-- **Automatic asset path resolution** using Vite's manifest.json
+- **Automatic asset path resolution** using Vite's `manifest.json`
 - **Automatic build entry detection** from Script/Link components with flexible component-attribute mapping
 - **Framework agnostic** components for both hono/jsx and React
 
