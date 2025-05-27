@@ -72,6 +72,9 @@ That's it! The plugin automatically:
 
 ## Components
 
+> [!IMPORTANT]
+> If you define custom components with the same names as the default `Link` and `Script` components, unexpected behavior may occur. In such cases, use different names for your custom components or specify custom component names in the plugin's `components` configuration.
+
 ### ViteClient
 
 Adds Vite client script for development mode.
