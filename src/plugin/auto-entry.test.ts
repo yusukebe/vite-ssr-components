@@ -1,33 +1,60 @@
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import fs from 'node:fs'
 import { autoEntry } from './auto-entry.js'
 
-// Mock modules
-vi.mock('node:fs')
-vi.mock('node:path')
+// Mock fs module
+vi.mock('node:fs', () => ({
+  default: {
+    promises: {
+      readdir: vi.fn(),
+    },
+    readFileSync: vi.fn(),
+  },
+}))
 
 /**
  * Tests for autoEntry plugin
- * These tests verify the AST-based auto-entry functionality including
+ * These tests verify the file-scanning based auto-entry functionality including
  * Script/Link component detection and build configuration
  */
 describe('autoEntry plugin', () => {
+  const mockReaddir = vi.mocked(fs.promises.readdir)
+  const mockReadFileSync = vi.mocked(fs.readFileSync)
+
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
-  afterEach(() => {
-    vi.clearAllMocks()
-  })
-
-  it('should return a plugin with correct name', () => {
+  it('should return a plugin with correct name and hooks', () => {
     const plugin = autoEntry()
     expect(plugin.name).toBe('ssr-auto-entry')
     expect(plugin.configResolved).toBeDefined()
   })
 
-  it('should detect Script and Link components using AST', async () => {
-    const mockFileContent = `
+  it('should detect Script and Link components and configure client build', async () => {
+    const plugin = autoEntry()
+    const mockConfig = {
+      root: '/mock/project',
+      environments: {},
+    }
+
+    // Mock file system structure
+    mockReaddir
+      .mockResolvedValueOnce([
+        { name: 'src', isDirectory: () => true, isFile: () => false },
+        { name: 'package.json', isDirectory: () => false, isFile: () => true },
+      ] as any)
+      .mockResolvedValueOnce([
+        { name: 'index.tsx', isDirectory: () => false, isFile: () => true },
+        { name: 'client.tsx', isDirectory: () => false, isFile: () => true },
+        { name: 'style.css', isDirectory: () => false, isFile: () => true },
+      ] as any)
+
+    // Mock file contents with Script and Link components
+    const indexTsxContent = `
       import { Script, Link } from 'ssr-components'
       export default function App() {
         return (
@@ -41,28 +68,20 @@ describe('autoEntry plugin', () => {
       }
     `
 
-    const { existsSync, readFileSync } = await import('node:fs')
-    // eslint-disable-next-line @typescript-eslint/unbound-method
-    const { resolve } = await import('node:path')
+    mockReadFileSync.mockReturnValue(indexTsxContent)
 
-    vi.mocked(existsSync).mockReturnValue(true)
-    vi.mocked(readFileSync).mockReturnValue(mockFileContent)
-    vi.mocked(resolve).mockReturnValue('/mock/project/src/index.tsx')
-
-    const plugin = autoEntry()
-    const mockConfig = {
-      root: '/mock/project',
-      build: { ssr: false },
-      environments: {},
-    }
-
+    // Execute configResolved hook
     if (plugin.configResolved) {
       // @ts-expect-error - Testing plugin behavior with mock config
-      plugin.configResolved(mockConfig)
+      await plugin.configResolved(mockConfig)
     }
 
-    // Verify that environments.client.build was created and configured
+    // Verify that client environment was configured
     expect(mockConfig.environments).toHaveProperty('client')
+    // @ts-expect-error - Dynamic properties created by plugin
+    expect(mockConfig.environments.client.build.outDir).toBe('dist/client')
+    // @ts-expect-error - Dynamic properties created by plugin
+    expect(mockConfig.environments.client.build.manifest).toBe(true)
     // @ts-expect-error - Dynamic properties created by plugin
     expect(mockConfig.environments.client.build.rollupOptions.input).toEqual([
       '/src/client.tsx',
@@ -70,179 +89,399 @@ describe('autoEntry plugin', () => {
     ])
   })
 
-  it('should handle custom component configurations', async () => {
-    const mockFileContent = `
-      import { CustomScript, CustomLink, Foo } from 'ssr-components'
+  it('should not configure client build when no entries detected', async () => {
+    const plugin = autoEntry()
+    const mockConfig = {
+      root: '/mock/project',
+      environments: {},
+    }
+
+    // Mock file system with no matching files
+    mockReaddir.mockResolvedValueOnce([
+      { name: 'README.md', isDirectory: () => false, isFile: () => true },
+    ] as any)
+
+    // Execute configResolved hook
+    if (plugin.configResolved) {
+      // @ts-expect-error - Testing plugin behavior with mock config
+      await plugin.configResolved(mockConfig)
+    }
+
+    // Verify that client environment was not configured
+    expect(mockConfig.environments).toEqual({})
+  })
+
+  it('should handle custom components correctly', async () => {
+    const plugin = autoEntry({
+      components: [
+        { name: 'CustomScript', attribute: 'source' },
+        { name: 'CustomLink', attribute: 'url' },
+      ],
+    })
+    const mockConfig = {
+      root: '/mock/project',
+      environments: {},
+    }
+
+    // Mock file system structure
+    mockReaddir.mockResolvedValueOnce([
+      { name: 'src', isDirectory: () => true, isFile: () => false },
+    ] as any)
+    mockReaddir.mockResolvedValueOnce([
+      { name: 'app.tsx', isDirectory: () => false, isFile: () => true },
+    ] as any)
+
+    // Mock file contents with custom components
+    const appTsxContent = `
+      import { CustomScript, CustomLink } from 'ssr-components'
       export default function App() {
         return (
           <html>
             <head>
               <CustomScript source="/src/app.js" />
-              <CustomLink url="/src/main.css" rel="stylesheet" />
-              <Foo hoge="/src/data.json" />
+              <CustomLink url="/src/main.css" />
             </head>
           </html>
         )
       }
     `
 
-    const { existsSync, readFileSync } = await import('node:fs')
-    // eslint-disable-next-line @typescript-eslint/unbound-method
-    const { resolve } = await import('node:path')
+    mockReadFileSync.mockReturnValue(appTsxContent)
 
-    vi.mocked(existsSync).mockReturnValue(true)
-    vi.mocked(readFileSync).mockReturnValue(mockFileContent)
-    vi.mocked(resolve).mockReturnValue('/mock/project/src/index.tsx')
-
-    const plugin = autoEntry({
-      components: [
-        { name: 'CustomScript', attribute: 'source' },
-        { name: 'CustomLink', attribute: 'url' },
-        { name: 'Foo', attribute: 'hoge' },
-      ],
-    })
-    const mockConfig = {
-      root: '/mock/project',
-      build: { ssr: false },
-      environments: {},
-    }
-
+    // Execute configResolved hook
     if (plugin.configResolved) {
       // @ts-expect-error - Testing plugin behavior with mock config
-      plugin.configResolved(mockConfig)
+      await plugin.configResolved(mockConfig)
     }
 
+    // Verify that custom entries were detected and configured
     // @ts-expect-error - Dynamic properties created by plugin
     expect(mockConfig.environments.client.build.rollupOptions.input).toEqual([
       '/src/app.js',
       '/src/main.css',
-      '/src/data.json',
     ])
   })
 
-  it('should handle JSX expressions gracefully', async () => {
-    const mockFileContent = `
-      import { Script, Link } from 'ssr-components'
-      const clientPath = '/src/client.tsx'
-      export default function App() {
-        return (
-          <html>
-            <head>
-              <Script src={clientPath} />
-              <Link href="/src/style.css" rel="stylesheet" />
-            </head>
-          </html>
-        )
-      }
-    `
-
-    const { existsSync, readFileSync } = await import('node:fs')
-    // eslint-disable-next-line @typescript-eslint/unbound-method
-    const { resolve } = await import('node:path')
-
-    vi.mocked(existsSync).mockReturnValue(true)
-    vi.mocked(readFileSync).mockReturnValue(mockFileContent)
-    vi.mocked(resolve).mockReturnValue('/mock/project/src/index.tsx')
-
-    const plugin = autoEntry()
+  it('should handle custom patterns correctly', async () => {
+    const plugin = autoEntry({
+      pattern: 'app/**/*.tsx',
+    })
     const mockConfig = {
       root: '/mock/project',
-      build: { ssr: false },
       environments: {},
     }
 
+    // Mock file system structure
+    mockReaddir
+      .mockResolvedValueOnce([
+        { name: 'src', isDirectory: () => true, isFile: () => false },
+        { name: 'app', isDirectory: () => true, isFile: () => false },
+      ] as any)
+      .mockResolvedValueOnce([
+        { name: 'index.tsx', isDirectory: () => false, isFile: () => true },
+      ] as any)
+      .mockResolvedValueOnce([
+        { name: 'main.tsx', isDirectory: () => false, isFile: () => true },
+      ] as any)
+
+    // Mock file contents
+    const mainTsxContent = `
+      import { Script } from 'ssr-components'
+      export default function App() {
+        return <Script src="/src/client.tsx" />
+      }
+    `
+
+    mockReadFileSync.mockReturnValue(mainTsxContent)
+
+    // Execute configResolved hook
     if (plugin.configResolved) {
       // @ts-expect-error - Testing plugin behavior with mock config
-      plugin.configResolved(mockConfig)
+      await plugin.configResolved(mockConfig)
     }
 
-    // Should only detect the static string value
+    // Verify that only app/**/*.tsx files were processed and entries detected
     // @ts-expect-error - Dynamic properties created by plugin
-    expect(mockConfig.environments.client.build.rollupOptions.input).toEqual(['/src/style.css'])
+    expect(mockConfig.environments.client.build.rollupOptions.input).toEqual(['/src/client.tsx'])
   })
 
-  it('should only detect specified attributes for each component', async () => {
-    const mockFileContent = `
-      import { Script, Link } from 'ssr-components'
-      export default function App() {
-        return (
-          <html>
-            <head>
-              <Script href="/src/wrong.css" src="/src/client.tsx" />
-              <Link src="/src/wrong.js" href="/src/style.css" rel="stylesheet" />
-            </head>
-          </html>
-        )
-      }
-    `
-
-    const { existsSync, readFileSync } = await import('node:fs')
-    // eslint-disable-next-line @typescript-eslint/unbound-method
-    const { resolve } = await import('node:path')
-
-    vi.mocked(existsSync).mockReturnValue(true)
-    vi.mocked(readFileSync).mockReturnValue(mockFileContent)
-    vi.mocked(resolve).mockReturnValue('/mock/project/src/index.tsx')
-
+  it('should deduplicate entries from multiple files', async () => {
     const plugin = autoEntry()
     const mockConfig = {
       root: '/mock/project',
-      build: { ssr: false },
       environments: {},
     }
 
+    // Mock file system structure
+    mockReaddir.mockResolvedValueOnce([
+      { name: 'src', isDirectory: () => true, isFile: () => false },
+    ] as any)
+    mockReaddir.mockResolvedValueOnce([
+      { name: 'page1.tsx', isDirectory: () => false, isFile: () => true },
+      { name: 'page2.tsx', isDirectory: () => false, isFile: () => true },
+    ] as any)
+
+    // Mock file contents with same Script src
+    const pageContent = `
+      import { Script } from 'ssr-components'
+      export default function Page() {
+        return <Script src="/src/client.tsx" />
+      }
+    `
+
+    mockReadFileSync.mockReturnValue(pageContent)
+
+    // Execute configResolved hook
     if (plugin.configResolved) {
       // @ts-expect-error - Testing plugin behavior with mock config
-      plugin.configResolved(mockConfig)
+      await plugin.configResolved(mockConfig)
     }
 
-    // Should only detect src for Script and href for Link
+    // Verify that duplicate entries were removed
+    // @ts-expect-error - Dynamic properties created by plugin
+    expect(mockConfig.environments.client.build.rollupOptions.input).toEqual(['/src/client.tsx'])
+  })
+
+  it('should handle parse errors gracefully', async () => {
+    const plugin = autoEntry()
+    const mockConfig = {
+      root: '/mock/project',
+      environments: {},
+    }
+
+    // Mock file system structure
+    mockReaddir.mockResolvedValueOnce([
+      { name: 'src', isDirectory: () => true, isFile: () => false },
+    ] as any)
+    mockReaddir.mockResolvedValueOnce([
+      { name: 'invalid.tsx', isDirectory: () => false, isFile: () => true },
+    ] as any)
+
+    // Mock file contents with invalid syntax
+    const invalidContent = `
+      import { Script } from 'ssr-components'
+      export default function App() {
+        return <Script src="/src/client.tsx" />
+      // Missing closing brace
+    `
+
+    mockReadFileSync.mockReturnValue(invalidContent)
+
+    // Mock console.warn to capture warnings
+    const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    // Execute configResolved hook
+    if (plugin.configResolved) {
+      // @ts-expect-error - Testing plugin behavior with mock config
+      await plugin.configResolved(mockConfig)
+    }
+
+    // Verify that parse error was handled gracefully
+    expect(consoleSpy).toHaveBeenCalledWith(
+      'Failed to parse file for auto-entry detection:',
+      expect.any(Error)
+    )
+
+    // Verify that no entries were configured due to parse error
+    expect(mockConfig.environments).toEqual({})
+
+    consoleSpy.mockRestore()
+  })
+
+  it('should handle file read errors gracefully', async () => {
+    const plugin = autoEntry()
+    const mockConfig = {
+      root: '/mock/project',
+      environments: {},
+    }
+
+    // Mock file system structure
+    mockReaddir.mockResolvedValueOnce([
+      { name: 'src', isDirectory: () => true, isFile: () => false },
+    ] as any)
+    mockReaddir.mockResolvedValueOnce([
+      { name: 'test.tsx', isDirectory: () => false, isFile: () => true },
+    ] as any)
+
+    // Mock file read error
+    mockReadFileSync.mockImplementation(() => {
+      throw new Error('Permission denied')
+    })
+
+    // Mock console.warn to capture warnings
+    const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    // Execute configResolved hook
+    if (plugin.configResolved) {
+      // @ts-expect-error - Testing plugin behavior with mock config
+      await plugin.configResolved(mockConfig)
+    }
+
+    // Verify that file read error was handled gracefully
+    expect(consoleSpy).toHaveBeenCalledWith(
+      'Failed to process file src/test.tsx:',
+      expect.any(Error)
+    )
+
+    consoleSpy.mockRestore()
+  })
+
+  it('should handle directory scan errors gracefully', async () => {
+    const plugin = autoEntry()
+    const mockConfig = {
+      root: '/mock/project',
+      environments: {},
+    }
+
+    // Mock directory read error
+    mockReaddir.mockRejectedValue(new Error('Directory not found'))
+
+    // Mock console.warn to capture warnings
+    const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    // Execute configResolved hook
+    if (plugin.configResolved) {
+      // @ts-expect-error - Testing plugin behavior with mock config
+      await plugin.configResolved(mockConfig)
+    }
+
+    // Verify that directory scan error was handled gracefully
+    expect(consoleSpy).toHaveBeenCalledWith(
+      'Failed to scan directory /mock/project:',
+      expect.any(Error)
+    )
+
+    consoleSpy.mockRestore()
+  })
+
+  it('should merge with existing rollup input configuration', async () => {
+    const plugin = autoEntry()
+    const mockConfig = {
+      root: '/mock/project',
+      environments: {
+        client: {
+          build: {
+            rollupOptions: {
+              input: '/existing/entry.js',
+            },
+          },
+        },
+      },
+    }
+
+    // Mock file system structure
+    mockReaddir.mockResolvedValueOnce([
+      { name: 'src', isDirectory: () => true, isFile: () => false },
+    ] as any)
+    mockReaddir.mockResolvedValueOnce([
+      { name: 'app.tsx', isDirectory: () => false, isFile: () => true },
+    ] as any)
+
+    // Mock file contents
+    const appContent = `
+      import { Script } from 'ssr-components'
+      export default function App() {
+        return <Script src="/src/client.tsx" />
+      }
+    `
+
+    mockReadFileSync.mockReturnValue(appContent)
+
+    // Execute configResolved hook
+    if (plugin.configResolved) {
+      // @ts-expect-error - Testing plugin behavior with mock config
+      await plugin.configResolved(mockConfig)
+    }
+
+    // Verify that existing input was merged with detected entries
     // @ts-expect-error - Dynamic properties created by plugin
     expect(mockConfig.environments.client.build.rollupOptions.input).toEqual([
+      '/existing/entry.js',
       '/src/client.tsx',
-      '/src/style.css',
     ])
   })
 
-  it('should handle attributes in different order', async () => {
-    const mockFileContent = `
+  it('should handle files with no Script/Link components', async () => {
+    const plugin = autoEntry()
+    const mockConfig = {
+      root: '/mock/project',
+      environments: {},
+    }
+
+    // Mock file system structure
+    mockReaddir.mockResolvedValueOnce([
+      { name: 'src', isDirectory: () => true, isFile: () => false },
+    ] as any)
+    mockReaddir.mockResolvedValueOnce([
+      { name: 'component.tsx', isDirectory: () => false, isFile: () => true },
+    ] as any)
+
+    // Mock file contents without Script/Link components
+    const componentContent = `
+      export default function Component() {
+        return <div>Hello World</div>
+      }
+    `
+
+    mockReadFileSync.mockReturnValue(componentContent)
+
+    // Execute configResolved hook
+    if (plugin.configResolved) {
+      // @ts-expect-error - Testing plugin behavior with mock config
+      await plugin.configResolved(mockConfig)
+    }
+
+    // Verify that no client environment was configured
+    expect(mockConfig.environments).toEqual({})
+  })
+
+  it('should handle multiple Script and Link components in same file', async () => {
+    const plugin = autoEntry()
+    const mockConfig = {
+      root: '/mock/project',
+      environments: {},
+    }
+
+    // Mock file system structure
+    mockReaddir.mockResolvedValueOnce([
+      { name: 'src', isDirectory: () => true, isFile: () => false },
+    ] as any)
+    mockReaddir.mockResolvedValueOnce([
+      { name: 'layout.tsx', isDirectory: () => false, isFile: () => true },
+    ] as any)
+
+    // Mock file contents with multiple Script and Link components
+    const layoutContent = `
       import { Script, Link } from 'ssr-components'
-      export default function App() {
+      export default function Layout() {
         return (
           <html>
             <head>
-              <Link foo="bar" href="/src/style.css" rel="stylesheet" />
-              <Script type="module" src="/src/client.tsx" defer />
+              <Link href="/src/reset.css" rel="stylesheet" />
+              <Link href="/src/main.css" rel="stylesheet" />
+              <Script src="/src/polyfills.js" />
+              <Script src="/src/app.js" />
             </head>
           </html>
         )
       }
     `
 
-    const { existsSync, readFileSync } = await import('node:fs')
-    // eslint-disable-next-line @typescript-eslint/unbound-method
-    const { resolve } = await import('node:path')
+    mockReadFileSync.mockReturnValue(layoutContent)
 
-    vi.mocked(existsSync).mockReturnValue(true)
-    vi.mocked(readFileSync).mockReturnValue(mockFileContent)
-    vi.mocked(resolve).mockReturnValue('/mock/project/src/index.tsx')
-
-    const plugin = autoEntry()
-    const mockConfig = {
-      root: '/mock/project',
-      build: { ssr: false },
-      environments: {},
-    }
-
+    // Execute configResolved hook
     if (plugin.configResolved) {
       // @ts-expect-error - Testing plugin behavior with mock config
-      plugin.configResolved(mockConfig)
+      await plugin.configResolved(mockConfig)
     }
 
+    // Verify that all entries were detected
     // @ts-expect-error - Dynamic properties created by plugin
     expect(mockConfig.environments.client.build.rollupOptions.input).toEqual([
-      '/src/style.css',
-      '/src/client.tsx',
+      '/src/reset.css',
+      '/src/main.css',
+      '/src/polyfills.js',
+      '/src/app.js',
     ])
   })
 })

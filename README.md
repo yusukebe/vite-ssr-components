@@ -64,8 +64,9 @@ function App() {
 
 That's it! The plugin automatically:
 
-- Detects Script/Link components in your SSR code
-- Adds the referenced files to Vite's build input
+- Scans your source files for Script/Link components
+- Detects the referenced files from component attributes
+- Adds the detected files to Vite's build input
 - Configures client build settings
 - Enables SSR hot reload
 
@@ -202,7 +203,7 @@ interface ComponentConfig {
 
 interface SSRPluginOptions {
   buildAssets?: {
-    entryFile?: string // Entry file to scan (default: 'src/index.tsx')
+    pattern?: string | string[] // File patterns to scan (default: 'src/**/*.{tsx,ts}')
     components?: ComponentConfig[] // Component configurations (default: [{ name: 'Script', attribute: 'src' }, { name: 'Link', attribute: 'href' }])
   }
   hotReload?:
@@ -222,12 +223,12 @@ export default defineConfig({
   plugins: [ssrPlugin()],
 })
 
-// Custom component configurations
+// Custom file patterns and component configurations
 export default defineConfig({
   plugins: [
     ssrPlugin({
       buildAssets: {
-        entryFile: 'src/server.tsx',
+        pattern: ['src/**/*.tsx', 'app/**/*.ts'], // Scan multiple patterns
         components: [
           { name: 'Script', attribute: 'src' },
           { name: 'Link', attribute: 'href' },
@@ -246,6 +247,17 @@ export default defineConfig({
   ],
 })
 
+// Scan only specific directories
+export default defineConfig({
+  plugins: [
+    ssrPlugin({
+      buildAssets: {
+        pattern: 'app/**/*.tsx', // Only scan app directory
+      },
+    }),
+  ],
+})
+
 // Disable hot reload
 export default defineConfig({
   plugins: [
@@ -255,6 +267,53 @@ export default defineConfig({
   ],
 })
 ```
+
+#### Auto-Entry Detection
+
+The plugin automatically scans your source files to detect Script/Link components and extracts file paths from their attributes. This eliminates the need to manually configure build entries.
+
+**How it works:**
+
+1. **File Scanning**: The plugin scans files matching the specified patterns (default: `src/**/*.{tsx,ts}`)
+2. **AST Analysis**: Each file is parsed and analyzed to find JSX components
+3. **Component Detection**: Components matching the configured names are detected
+4. **Attribute Extraction**: File paths are extracted from the specified attributes
+5. **Build Configuration**: Detected files are automatically added to Vite's build input
+
+**Example:**
+
+```tsx
+// src/pages/home.tsx
+function HomePage() {
+  return (
+    <html>
+      <head>
+        <Script src='/src/client.tsx' />
+        <Link href='/src/style.css' rel='stylesheet' />
+      </head>
+    </html>
+  )
+}
+
+// src/pages/about.tsx
+function AboutPage() {
+  return (
+    <html>
+      <head>
+        <Script src='/src/about-client.tsx' />
+        <Link href='/src/about.css' rel='stylesheet' />
+      </head>
+    </html>
+  )
+}
+```
+
+The plugin will automatically detect and add these files to the build:
+
+- `/src/client.tsx`
+- `/src/style.css`
+- `/src/about-client.tsx`
+- `/src/about.css`
 
 #### Custom Component Detection
 
@@ -291,6 +350,28 @@ Each component type only looks for its specified attribute, ensuring accurate de
 <Script href="/src/wrong.css" src="/src/client.tsx" />  // Only 'src' is detected
 <Link src="/src/wrong.js" href="/src/style.css" />     // Only 'href' is detected
 ```
+
+#### File Pattern Matching
+
+The plugin supports flexible file pattern matching using glob patterns:
+
+```ts
+// Single pattern
+pattern: 'src/**/*.tsx'
+
+// Multiple patterns
+pattern: ['src/**/*.tsx', 'app/**/*.ts', 'components/**/*.jsx']
+
+// Exclude specific directories
+pattern: ['src/**/*.{tsx,ts}', '!src/test/**/*']
+```
+
+**Pattern Examples:**
+
+- `src/**/*.tsx` - All .tsx files in src directory and subdirectories
+- `app/**/*.{ts,tsx}` - All .ts and .tsx files in app directory
+- `**/*.jsx` - All .jsx files in the entire project
+- `!node_modules/**/*` - Exclude node_modules directory
 
 ## Examples
 

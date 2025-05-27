@@ -1,8 +1,12 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/prefer-nullish-coalescing */
 /* eslint-disable @typescript-eslint/no-unnecessary-condition */
 import { parse } from '@babel/parser'
 import _traverse from '@babel/traverse'
+import picomatch from 'picomatch'
 import type { Plugin } from 'vite'
+import { normalizePath } from 'vite'
 import fs from 'node:fs'
 import path from 'node:path'
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -15,13 +19,13 @@ interface ComponentConfig {
 }
 
 interface AutoEntryOptions {
-  entryFile?: string
+  pattern?: string | string[]
   components?: ComponentConfig[]
 }
 
 export function autoEntry(options: AutoEntryOptions = {}): Plugin {
   const {
-    entryFile = 'src/index.tsx',
+    pattern = 'src/**/*.{tsx,ts}',
     components = [
       { name: 'Script', attribute: 'src' },
       { name: 'Link', attribute: 'href' },
@@ -30,114 +34,178 @@ export function autoEntry(options: AutoEntryOptions = {}): Plugin {
 
   return {
     name: 'ssr-auto-entry',
-    configResolved(config) {
-      // Auto-detect SSR entry point if entryFile is not specified
-      let targetFile = entryFile
-      if (entryFile === 'src/index.tsx') {
-        // For default case, prioritize SSR setting if available
-        const ssrEntry = config.build.ssr
-        if (typeof ssrEntry === 'string') {
-          targetFile = ssrEntry
+    async configResolved(config) {
+      // Normalize patterns
+      const patterns = Array.isArray(pattern) ? pattern : [pattern]
+      const normalizedPatterns = patterns.map((p) => normalizeGlobPattern(p, config.root))
+
+      // Create matcher
+      const matcher = picomatch(normalizedPatterns, { dot: true })
+
+      // Scan files and detect entries
+      const detectedEntries = new Set<string>()
+      await scanFiles(config.root, matcher, components, detectedEntries)
+
+      // Apply detected entries to config if any found
+      if (detectedEntries.size > 0) {
+        const entriesArray = Array.from(detectedEntries)
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const viteConfig = config as any
+
+        if (!viteConfig.environments) {
+          viteConfig.environments = {}
         }
-      }
+        if (!viteConfig.environments.client) {
+          viteConfig.environments.client = {}
+        }
+        if (!viteConfig.environments.client.build) {
+          viteConfig.environments.client.build = {}
+        }
 
-      const entryPath = path.resolve(config.root, targetFile)
+        const clientBuild = viteConfig.environments.client.build
 
-      if (fs.existsSync(entryPath)) {
-        const content = fs.readFileSync(entryPath, 'utf-8')
-        const detectedEntries = extractEntriesFromAST(content, components)
+        // Automatically set outDir
+        if (!clientBuild.outDir) {
+          clientBuild.outDir = 'dist/client'
+        }
 
-        if (detectedEntries.length > 0) {
-          const configAny = config
+        // Automatically enable manifest
+        clientBuild.manifest = true
 
-          if (!configAny.environments) {
-            // @ts-expect-error - configAny.environments may be blank
-            configAny.environments = {}
-          }
-          if (!configAny.environments.client) {
-            // @ts-expect-error - configAny.environments.client may be blank
-            configAny.environments.client = {}
-          }
-          if (!configAny.environments.client.build) {
-            // @ts-expect-error - configAny.environments.client.build may be blank
-            configAny.environments.client.build = {}
-          }
+        // Set rollupOptions.input
+        if (!clientBuild.rollupOptions) {
+          clientBuild.rollupOptions = {}
+        }
 
-          const clientBuild = configAny.environments.client.build
+        const clientInput = clientBuild.rollupOptions.input
 
-          // Automatically set outDir
-          if (!clientBuild.outDir) {
-            clientBuild.outDir = 'dist/client'
-          }
-
-          // Automatically enable manifest
-          clientBuild.manifest = true
-
-          // Set rollupOptions.input
-          if (!clientBuild.rollupOptions) {
-            clientBuild.rollupOptions = {}
-          }
-
-          const clientInput = clientBuild.rollupOptions.input
-
-          if (Array.isArray(clientInput)) {
-            clientBuild.rollupOptions.input = [...clientInput, ...detectedEntries]
-          } else if (typeof clientInput === 'string') {
-            clientBuild.rollupOptions.input = [clientInput, ...detectedEntries]
-          } else {
-            clientBuild.rollupOptions.input = detectedEntries
-          }
+        if (Array.isArray(clientInput)) {
+          clientBuild.rollupOptions.input = [...clientInput, ...entriesArray]
+        } else if (typeof clientInput === 'string') {
+          clientBuild.rollupOptions.input = [clientInput, ...entriesArray]
+        } else {
+          clientBuild.rollupOptions.input = entriesArray
         }
       }
     },
   }
 }
 
-function extractEntriesFromAST(code: string, components: ComponentConfig[]): string[] {
-  const entries: string[] = []
+async function scanFiles(
+  root: string,
+  matcher: (file: string) => boolean,
+  components: ComponentConfig[],
+  detectedEntries: Set<string>
+): Promise<void> {
+  async function scan(currentDir: string): Promise<void> {
+    try {
+      const entries = await fs.promises.readdir(currentDir, { withFileTypes: true })
 
-  // Parse the code into an AST
-  const ast = parse(code, {
-    sourceType: 'module',
-    plugins: ['jsx', 'typescript'],
-  })
+      for (const entry of entries) {
+        const fullPath = path.join(currentDir, entry.name)
 
-  // Create a map for quick lookup
-  const componentMap = new Map<string, string>()
-  components.forEach((comp) => {
-    componentMap.set(comp.name, comp.attribute)
-  })
+        if (entry.isDirectory()) {
+          // Skip node_modules and other common directories
+          if (!entry.name.startsWith('.') && entry.name !== 'node_modules') {
+            await scan(fullPath)
+          }
+        } else if (entry.isFile()) {
+          const relativePath = normalizePath(path.relative(root, fullPath))
 
-  // Traverse the AST to find JSX elements
-  traverse(ast, {
-    JSXElement(path) {
-      const element = path.node
-      const openingElement = element.openingElement
-
-      // Check if this is one of our target components
-      if (
-        openingElement.name.type === 'JSXIdentifier' &&
-        componentMap.has(openingElement.name.name)
-      ) {
-        const targetAttribute = componentMap.get(openingElement.name.name)!
-
-        // Look for the specific attribute for this component
-        for (const attr of openingElement.attributes) {
-          if (
-            attr.type === 'JSXAttribute' &&
-            attr.name.type === 'JSXIdentifier' &&
-            attr.name.name === targetAttribute &&
-            attr.value?.type === 'StringLiteral'
-          ) {
-            const value = attr.value.value
-            if (value) {
-              entries.push(value)
+          // Check if this file matches our pattern
+          if (matcher(relativePath)) {
+            try {
+              const code = fs.readFileSync(fullPath, 'utf-8')
+              const entries = extractEntriesFromAST(code, components)
+              entries.forEach((entry) => detectedEntries.add(entry))
+            } catch (error) {
+              // Ignore files that can't be read or parsed
+              console.warn(`Failed to process file ${relativePath}:`, error)
             }
           }
         }
       }
-    },
-  })
+    } catch (error) {
+      console.warn(`Failed to scan directory ${currentDir}:`, error)
+    }
+  }
 
-  return [...new Set(entries)]
+  await scan(root)
+}
+
+function normalizeGlobPattern(pattern: string, root: string): string {
+  const normalized = normalizePath(pattern)
+
+  if (path.isAbsolute(normalized)) {
+    const relative = path.relative(root, normalized)
+    if (!relative.startsWith('..') && !path.isAbsolute(relative)) {
+      return normalizePath(relative)
+    }
+    return normalized.slice(1)
+  }
+
+  if (normalized.startsWith('/')) {
+    return normalized.slice(1)
+  }
+
+  if (normalized.startsWith('./')) {
+    return normalized.slice(2)
+  }
+
+  return normalized
+}
+
+function extractEntriesFromAST(code: string, components: ComponentConfig[]): string[] {
+  const entries: string[] = []
+
+  try {
+    // Parse the code into an AST
+    const ast = parse(code, {
+      sourceType: 'module',
+      plugins: ['jsx', 'typescript'],
+    })
+
+    // Create a map for quick lookup
+    const componentMap = new Map<string, string>()
+    components.forEach((comp) => {
+      componentMap.set(comp.name, comp.attribute)
+    })
+
+    // Traverse the AST to find JSX elements
+    traverse(ast, {
+      JSXElement(path) {
+        const element = path.node
+        const openingElement = element.openingElement
+
+        // Check if this is one of our target components
+        if (
+          openingElement.name.type === 'JSXIdentifier' &&
+          componentMap.has(openingElement.name.name)
+        ) {
+          const targetAttribute = componentMap.get(openingElement.name.name)!
+
+          // Look for the specific attribute for this component
+          for (const attr of openingElement.attributes) {
+            if (
+              attr.type === 'JSXAttribute' &&
+              attr.name.type === 'JSXIdentifier' &&
+              attr.name.name === targetAttribute &&
+              attr.value?.type === 'StringLiteral'
+            ) {
+              const value = attr.value.value
+              if (value) {
+                entries.push(value)
+              }
+            }
+          }
+        }
+      },
+    })
+  } catch (error) {
+    // Ignore parse errors for files that might not be valid JSX/TSX
+    console.warn(`Failed to parse file for auto-entry detection:`, error)
+  }
+
+  return entries
 }
