@@ -1,6 +1,7 @@
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
+/* eslint-disable @typescript-eslint/no-unnecessary-condition */
 import { parse } from '@babel/parser'
 import traverse from '@babel/traverse'
-import type { JSXElement, StringLiteral } from '@babel/types'
 import type { Plugin } from 'vite'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -44,7 +45,6 @@ export function autoEntry(options: AutoEntryOptions = {}): Plugin {
         const detectedEntries = extractEntriesFromAST(content, components)
 
         if (detectedEntries.length > 0) {
-          // @ts-expect-error - Dynamic configuration modification for environments
           const configAny = config
 
           if (!configAny.environments) {
@@ -108,7 +108,7 @@ function extractEntriesFromAST(code: string, components: ComponentConfig[]): str
   // Traverse the AST to find JSX elements
   traverse(ast, {
     JSXElement(path) {
-      const element = path.node as JSXElement
+      const element = path.node
       const openingElement = element.openingElement
 
       // Check if this is one of our target components
@@ -126,7 +126,7 @@ function extractEntriesFromAST(code: string, components: ComponentConfig[]): str
             attr.name.name === targetAttribute &&
             attr.value?.type === 'StringLiteral'
           ) {
-            const value = (attr.value as StringLiteral).value
+            const value = attr.value.value
             if (value) {
               entries.push(value)
             }
