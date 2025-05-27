@@ -394,7 +394,6 @@ describe('autoEntry plugin', () => {
     }
 
     // Verify that existing input was merged with detected entries
-    // @ts-expect-error - Dynamic properties created by plugin
     expect(mockConfig.environments.client.build.rollupOptions.input).toEqual([
       '/existing/entry.js',
       '/src/client.tsx',
