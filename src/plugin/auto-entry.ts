@@ -1,10 +1,13 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 /* eslint-disable @typescript-eslint/no-unnecessary-condition */
 import { parse } from '@babel/parser'
-import traverse from '@babel/traverse'
+import _traverse from '@babel/traverse'
 import type { Plugin } from 'vite'
 import fs from 'node:fs'
 import path from 'node:path'
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
+const traverse = (_traverse.default as typeof _traverse) ?? _traverse
 
 interface ComponentConfig {
   name: string
