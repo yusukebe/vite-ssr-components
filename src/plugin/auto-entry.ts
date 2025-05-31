@@ -18,7 +18,7 @@ interface ComponentConfig {
   attribute: string
 }
 
-interface AutoEntryOptions {
+export interface AutoEntryOptions {
   pattern?: string | string[]
   components?: ComponentConfig[]
 }
