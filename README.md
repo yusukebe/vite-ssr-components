@@ -199,7 +199,7 @@ export default defineConfig({
 #### Options
 
 ```ts
-interface ComponentConfig {
+interface Component {
   name: string // Component name to detect
   attribute: string // Attribute name to extract file path from
 }
@@ -207,7 +207,7 @@ interface ComponentConfig {
 interface SSRPluginOptions {
   entry?: {
     target?: string | string[] // File patterns to scan (default: 'src/**/*.{tsx,ts}')
-    components?: ComponentConfig[] // Component configurations (default: [{ name: 'Script', attribute: 'src' }, { name: 'Link', attribute: 'href' }])
+    components?: Component[] // Component configurations (default: [{ name: 'Script', attribute: 'src' }, { name: 'Link', attribute: 'href' }])
   }
   hotReload?:
     | boolean
