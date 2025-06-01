@@ -1,30 +1,32 @@
 import type { Plugin } from 'vite'
 import { autoEntry } from './auto-entry.js'
-import type { AutoEntryOptions } from './auto-entry.js'
+import type { EntryOptions } from './auto-entry.js'
 import hotReload from './hot-reload.js'
 
+type HotReloadOptions =
+  | boolean
+  | {
+      target?: string | string[]
+      ignore?: string | string[]
+    }
+
 interface SSRPluginOptions {
-  buildAssets?: AutoEntryOptions
-  hotReload?:
-    | boolean
-    | {
-        entry?: string | string[]
-        ignore?: string | string[]
-      }
+  entry?: EntryOptions
+  hotReload?: HotReloadOptions
 }
 
 export default function ssrPlugin(options: SSRPluginOptions = {}): Plugin[] {
-  const { hotReload: hotReloadOption = true, buildAssets: buildAssetsOption = {} } = options
+  const { hotReload: hotReloadOption = true, entry: entryOption = {} } = options
 
   const plugins: Plugin[] = []
 
-  plugins.push(autoEntry(buildAssetsOption))
+  plugins.push(autoEntry(entryOption))
 
   if (hotReloadOption) {
-    const hotReloadOptions: { entry?: string | string[]; ignore?: string | string[] } = {}
+    const hotReloadOptions: { target?: string | string[]; ignore?: string | string[] } = {}
 
     if (typeof hotReloadOption === 'object') {
-      if (hotReloadOption.entry) hotReloadOptions.entry = hotReloadOption.entry
+      if (hotReloadOption.target) hotReloadOptions.target = hotReloadOption.target
       if (hotReloadOption.ignore) hotReloadOptions.ignore = hotReloadOption.ignore
     }
 

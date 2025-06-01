@@ -164,7 +164,7 @@ describe('autoEntry plugin', () => {
 
   it('should handle custom patterns correctly', async () => {
     const plugin = autoEntry({
-      pattern: 'app/**/*.tsx',
+      target: 'app/**/*.tsx',
     })
     const mockConfig = {
       root: '/mock/project',

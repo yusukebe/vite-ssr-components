@@ -205,14 +205,14 @@ interface ComponentConfig {
 }
 
 interface SSRPluginOptions {
-  buildAssets?: {
-    pattern?: string | string[] // File patterns to scan (default: 'src/**/*.{tsx,ts}')
+  entry?: {
+    target?: string | string[] // File patterns to scan (default: 'src/**/*.{tsx,ts}')
     components?: ComponentConfig[] // Component configurations (default: [{ name: 'Script', attribute: 'src' }, { name: 'Link', attribute: 'href' }])
   }
   hotReload?:
     | boolean
     | {
-        entry?: string | string[] // File patterns to watch (default: ['src/**/*.ts', 'src/**/*.tsx'])
+        target?: string | string[] // File patterns to watch (default: ['src/**/*.ts', 'src/**/*.tsx'])
         ignore?: string | string[] // File patterns to ignore
       }
 }
@@ -230,20 +230,20 @@ export default defineConfig({
 export default defineConfig({
   plugins: [
     ssrPlugin({
-      buildAssets: {
-        pattern: ['src/**/*.tsx', 'app/**/*.ts'], // Scan multiple patterns
+      entry: {
+        target: ['src/**/*.tsx', 'app/**/*.ts'], // Scan multiple patterns
         components: [
           { name: 'Script', attribute: 'src' },
           { name: 'Link', attribute: 'href' },
           { name: 'CustomScript', attribute: 'source' },
           { name: 'CustomLink', attribute: 'url' },
-          { name: 'Foo', attribute: 'hoge' },
+          { name: 'Foo', attribute: 'bar' },
           { name: 'DataLoader', attribute: 'dataPath' },
           { name: 'AssetLoader', attribute: 'assetUrl' },
         ],
       },
       hotReload: {
-        entry: ['src/**/*.ts', 'src/**/*.tsx'],
+        target: ['src/**/*.ts', 'src/**/*.tsx'],
         ignore: ['src/client/**/*'],
       },
     }),
@@ -254,8 +254,8 @@ export default defineConfig({
 export default defineConfig({
   plugins: [
     ssrPlugin({
-      buildAssets: {
-        pattern: 'app/**/*.tsx', // Only scan app directory
+      entry: {
+        target: 'app/**/*.tsx', // Only scan app directory
       },
     }),
   ],
@@ -330,7 +330,7 @@ function App() {
       <head>
         <CustomScript source='/src/app.js' />
         <CustomLink url='/src/main.css' />
-        <Foo hoge='/src/data.json' />
+        <Foo bar='/src/data.json' />
         <DataLoader dataPath='/src/config.json' />
         <AssetLoader assetUrl='/src/assets/image.png' />
       </head>
@@ -343,7 +343,7 @@ The plugin will automatically:
 
 - Detect `CustomScript` components and extract paths from the `source` attribute
 - Detect `CustomLink` components and extract paths from the `url` attribute
-- Detect `Foo` components and extract paths from the `hoge` attribute
+- Detect `Foo` components and extract paths from the `bar` attribute
 - And so on...
 
 Each component type only looks for its specified attribute, ensuring accurate detection:

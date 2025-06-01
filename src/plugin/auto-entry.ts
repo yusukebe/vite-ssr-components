@@ -13,19 +13,19 @@ import path from 'node:path'
 // @ts-ignore
 const traverse = (_traverse.default as typeof _traverse) ?? _traverse
 
-interface ComponentConfig {
+interface Component {
   name: string
   attribute: string
 }
 
-export interface AutoEntryOptions {
-  pattern?: string | string[]
-  components?: ComponentConfig[]
+export interface EntryOptions {
+  target?: string | string[]
+  components?: Component[]
 }
 
-export function autoEntry(options: AutoEntryOptions = {}): Plugin {
+export function autoEntry(options: EntryOptions = {}): Plugin {
   const {
-    pattern = 'src/**/*.{tsx,ts}',
+    target = 'src/**/*.{tsx,ts}',
     components = [
       { name: 'Script', attribute: 'src' },
       { name: 'Link', attribute: 'href' },
@@ -36,7 +36,7 @@ export function autoEntry(options: AutoEntryOptions = {}): Plugin {
     name: 'ssr-auto-entry',
     async configResolved(config) {
       // Normalize patterns
-      const patterns = Array.isArray(pattern) ? pattern : [pattern]
+      const patterns = Array.isArray(target) ? target : [target]
       const normalizedPatterns = patterns.map((p) => normalizeGlobPattern(p, config.root))
 
       // Create matcher
@@ -95,7 +95,7 @@ export function autoEntry(options: AutoEntryOptions = {}): Plugin {
 async function scanFiles(
   root: string,
   matcher: (file: string) => boolean,
-  components: ComponentConfig[],
+  components: Component[],
   detectedEntries: Set<string>
 ): Promise<void> {
   async function scan(currentDir: string): Promise<void> {
@@ -156,7 +156,7 @@ function normalizeGlobPattern(pattern: string, root: string): string {
   return normalized
 }
 
-function extractEntriesFromAST(code: string, components: ComponentConfig[]): string[] {
+function extractEntriesFromAST(code: string, components: Component[]): string[] {
   const entries: string[] = []
 
   try {
