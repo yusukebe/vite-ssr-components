@@ -1,6 +1,7 @@
 /** @jsxImportSource hono/jsx */
 /** @jsxRuntime automatic */
 export const ViteClient = () => {
-  if (import.meta.env.PROD) return <></>
+  // eslint-disable-next-line @typescript-eslint/prefer-optional-chain, @typescript-eslint/no-unnecessary-condition
+  if (import.meta.env && import.meta.env.PROD) return <></>
   return <script type='module' src='/@vite/client'></script>
 }

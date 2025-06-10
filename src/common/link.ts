@@ -11,7 +11,8 @@ export interface GetHrefOptions {
 
 export const getHrefFromManifest = ({ href, manifest, prod, baseUrl = '/' }: GetHrefOptions) => {
   if (!href) return undefined
-  if (prod ?? import.meta.env.PROD) {
+  // eslint-disable-next-line @typescript-eslint/prefer-optional-chain, @typescript-eslint/no-unnecessary-condition
+  if (prod ?? (import.meta.env && import.meta.env.PROD)) {
     manifest ??= loadManifest()
 
     if (manifest) {
