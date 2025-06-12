@@ -33,9 +33,12 @@ describe('ssrPlugin', () => {
 
   it('should pass options to auto-entry plugin', () => {
     const options = {
-      buildAssets: {
-        entryFile: 'custom/entry.tsx',
-        componentNames: ['CustomScript', 'CustomLink'],
+      entry: {
+        target: 'custom/**/*.tsx',
+        components: [
+          { name: 'CustomScript', attribute: 'src' },
+          { name: 'CustomLink', attribute: 'href' },
+        ],
       },
     }
     const plugins = ssrPlugin(options)
@@ -47,14 +50,14 @@ describe('ssrPlugin', () => {
     const pluginsWithHotReload = ssrPlugin({ hotReload: true })
     const pluginsWithoutHotReload = ssrPlugin({ hotReload: false })
 
-    expect(pluginsWithHotReload.length).toBe(2)
-    expect(pluginsWithoutHotReload.length).toBe(1)
+    expect(pluginsWithHotReload.length).toBe(3)
+    expect(pluginsWithoutHotReload.length).toBe(2)
   })
 
   it('should pass hot-reload options', () => {
     const options = {
       hotReload: {
-        entry: ['custom/**/*.ts'],
+        target: ['custom/**/*.ts'],
         ignore: ['**/*.test.ts'],
       },
     }
