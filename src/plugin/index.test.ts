@@ -50,8 +50,8 @@ describe('ssrPlugin', () => {
     const pluginsWithHotReload = ssrPlugin({ hotReload: true })
     const pluginsWithoutHotReload = ssrPlugin({ hotReload: false })
 
-    expect(pluginsWithHotReload.length).toBe(2)
-    expect(pluginsWithoutHotReload.length).toBe(1)
+    expect(pluginsWithHotReload.length).toBe(3)
+    expect(pluginsWithoutHotReload.length).toBe(2)
   })
 
   it('should pass hot-reload options', () => {

@@ -1,6 +1,7 @@
 import type { Plugin } from 'vite'
 import { autoEntry } from './auto-entry.js'
 import type { EntryOptions } from './auto-entry.js'
+import clientFirstBuild from './client-first-build.js'
 import hotReload from './hot-reload.js'
 
 type HotReloadOptions =
@@ -20,6 +21,7 @@ export default function ssrPlugin(options: SSRPluginOptions = {}): Plugin[] {
 
   const plugins: Plugin[] = []
 
+  plugins.push(clientFirstBuild())
   plugins.push(autoEntry(entryOption))
 
   if (hotReloadOption) {
