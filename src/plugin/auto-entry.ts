@@ -34,6 +34,9 @@ export function autoEntry(options: EntryOptions = {}): Plugin {
 
   return {
     name: 'ssr-auto-entry',
+    config(config) {
+      config.define = config.define || {}
+    },
     async configResolved(config) {
       // Normalize patterns
       const patterns = Array.isArray(target) ? target : [target]
@@ -66,12 +69,20 @@ export function autoEntry(options: EntryOptions = {}): Plugin {
         const clientBuild = viteConfig.environments.client.build
 
         // Automatically set outDir
-        if (!clientBuild.outDir) {
-          clientBuild.outDir = 'dist/client'
-        }
+        clientBuild.outDir ??= 'dist/client'
 
         // Automatically enable manifest
         clientBuild.manifest = true
+        if (!viteConfig.environments.ssr) {
+          const manifestPath = path.join(clientBuild.outDir as string, '.vite/manifest.json')
+          try {
+            const resolvedPath = path.resolve(process.cwd(), manifestPath)
+            const manifestContent = fs.readFileSync(resolvedPath, 'utf-8')
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            // @ts-ignore
+            config.define['import.meta.env.VITE_MANIFEST_CONTENT'] = JSON.stringify(manifestContent)
+          } catch {}
+        }
 
         // Set rollupOptions.input
         if (!clientBuild.rollupOptions) {
@@ -202,9 +213,8 @@ function extractEntriesFromAST(code: string, components: Component[]): string[] 
         }
       },
     })
-  } catch (error) {
+  } catch {
     // Ignore parse errors for files that might not be valid JSX/TSX
-    console.warn(`Failed to parse file for auto-entry detection:`, error)
   }
 
   return entries
