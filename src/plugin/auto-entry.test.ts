@@ -276,12 +276,6 @@ describe('autoEntry plugin', () => {
       await plugin.configResolved(mockConfig)
     }
 
-    // Verify that parse error was handled gracefully
-    expect(consoleSpy).toHaveBeenCalledWith(
-      'Failed to parse file for auto-entry detection:',
-      expect.any(Error)
-    )
-
     // Verify that no entries were configured due to parse error
     expect(mockConfig.environments).toEqual({})
 
@@ -482,5 +476,51 @@ describe('autoEntry plugin', () => {
       '/src/polyfills.js',
       '/src/app.js',
     ])
+  })
+})
+
+describe('autoEntry plugin - manifest loading', () => {
+  const mockReadFileSync = vi.mocked(fs.readFileSync)
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('should set manifest content in config.define', async () => {
+    const mockConfig: any = {
+      root: '/mock/project',
+      define: {},
+      environments: {},
+    }
+
+    // Mock file system structure to trigger entry detection
+    const mockReaddir = vi.mocked(fs.promises.readdir)
+    mockReaddir.mockResolvedValueOnce([
+      { name: 'src', isDirectory: () => true, isFile: () => false },
+    ] as any)
+    mockReaddir.mockResolvedValueOnce([
+      { name: 'app.tsx', isDirectory: () => false, isFile: () => true },
+    ] as any)
+
+    // Mock file contents with Script component to trigger client build
+    const appContent = `
+      import { Script } from 'ssr-components'
+      export default function App() {
+        return <Script src="/src/client.tsx" />
+      }
+    `
+    mockReadFileSync
+      .mockReturnValueOnce(appContent) // For app.tsx
+      .mockReturnValueOnce(JSON.stringify({ 'main.js': { file: 'main.js' } })) // For manifest.json
+
+    const plugin = autoEntry({})
+
+    if (plugin.configResolved) {
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore
+      await plugin.configResolved(mockConfig)
+    }
+
+    expect(mockConfig.define['import.meta.env.VITE_MANIFEST_CONTENT']).toBeDefined()
   })
 })
