@@ -39,4 +39,28 @@ describe('React - Script', () => {
     expect(html).toContain('defer=""')
     expect(html).toContain('data-testid="script-tag"')
   })
+
+  it('renders <script> with src and css from manifest in production mode', () => {
+    const manifest = {
+      'src/main.js': {
+        file: 'assets/main.12345.js',
+        src: 'src/main.js',
+        css: ['assets/main-abcde.css'],
+      },
+    }
+    const html = renderToString(
+      <Script
+        src='src/main.js'
+        manifest={manifest}
+        prod={true}
+        baseUrl='/'
+        crossOrigin='anonymous'
+        nonce='abc123xyz789'
+      />
+    )
+    expect(html).toContain('src="/assets/main.12345.js"')
+    expect(html).toContain(
+      '<link rel="stylesheet" crossorigin="anonymous" nonce="abc123xyz789" href="/assets/main-abcde.css"/>'
+    )
+  })
 })

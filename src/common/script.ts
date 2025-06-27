@@ -9,17 +9,33 @@ export interface GetSrcOptions {
   baseUrl?: string
 }
 
-export const getSrcFromManifest = ({ src, prod, manifest, baseUrl = '/' }: GetSrcOptions) => {
+export const getSrcFromManifest = ({
+  src,
+  prod,
+  manifest,
+  baseUrl = '/',
+}: GetSrcOptions): {
+  src?: string
+  css?: string[]
+} => {
   // eslint-disable-next-line @typescript-eslint/prefer-optional-chain, @typescript-eslint/no-unnecessary-condition
   if (prod ?? (import.meta.env && import.meta.env.PROD)) {
     manifest ??= loadManifest()
-
     if (manifest) {
+      const css: string[] = []
       const scriptInManifest = manifest[src.replace(/^\//, '')]
-      return `${ensureTrailingSlash(baseUrl)}${scriptInManifest.file}`
+      if (scriptInManifest.css) {
+        scriptInManifest.css.forEach((cssPath) => {
+          css.push(`${ensureTrailingSlash(baseUrl)}${cssPath}`)
+        })
+      }
+      return {
+        css,
+        src: `${ensureTrailingSlash(baseUrl)}${scriptInManifest.file}`,
+      }
     }
-    return undefined
+    return {}
   } else {
-    return src
+    return { src }
   }
 }
