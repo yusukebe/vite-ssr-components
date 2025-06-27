@@ -5,10 +5,21 @@ import type { StringLiteralUnion } from 'hono/utils/types'
 import type { GetSrcOptions } from '../common/script.js'
 import { getSrcFromManifest } from '../common/script.js'
 
-export const Script = (props: GetSrcOptions & Omit<ScriptHTMLAttributes, 'src'>) => {
-  const { src, manifest, prod, baseUrl, ...rest } = props
-  const scriptSrc = getSrcFromManifest({ src, prod, manifest, baseUrl })
-  return <script type='module' src={scriptSrc} {...rest} />
+export const Script = (props: GetSrcOptions & ScriptHTMLAttributes) => {
+  const { src, manifest, prod, baseUrl, nonce, crossorigin, ...rest } = props
+  const { src: scriptSrc, css: cssInScript } = getSrcFromManifest({ src, prod, manifest, baseUrl })
+  return (
+    <>
+      <script type='module' src={scriptSrc} crossorigin={crossorigin} {...rest} />
+      {cssInScript ? (
+        cssInScript.map((css) => {
+          return <link rel='stylesheet' crossorigin={crossorigin} nonce={nonce} href={css} />
+        })
+      ) : (
+        <></>
+      )}
+    </>
+  )
 }
 
 // Define an attributes type since ScriptHTMLAttributes is not exported

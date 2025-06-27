@@ -43,4 +43,28 @@ describe('hono/jsx - Script', () => {
     expect(html.toString()).toContain('defer')
     expect(html.toString()).toContain('data-testid="script-tag"')
   })
+
+  it('renders <script> with src and css from manifest in production mode', () => {
+    const manifest = {
+      'src/main.js': {
+        file: 'assets/main.12345.js',
+        src: 'src/main.js',
+        css: ['assets/main-abcde.css'],
+      },
+    }
+    const html = (
+      <Script
+        src='src/main.js'
+        manifest={manifest}
+        prod={true}
+        baseUrl='/'
+        crossorigin='anonymous'
+        nonce='abc123xyz789'
+      />
+    )
+    expect(html.toString()).toContain('src="/assets/main.12345.js"')
+    expect(html.toString()).toContain(
+      '<link rel="stylesheet" crossorigin="anonymous" nonce="abc123xyz789" href="/assets/main-abcde.css"/>'
+    )
+  })
 })
