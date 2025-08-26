@@ -25,10 +25,10 @@ export const loadManifest = (): Manifest | undefined => {
     }
   )
 
-  // Return the first manifest.json found
+  let manifestData = {}
   for (const [, manifestFile] of Object.entries(MANIFEST)) {
-    return manifestFile.default
+    manifestData = { ...manifestData, ...manifestFile.default }
   }
-
-  return undefined
+  // Return merged values
+  return manifestData
 }
