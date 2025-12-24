@@ -25,6 +25,12 @@ describe('ssrPlugin', () => {
     expect(hotReloadPlugin).toBeDefined()
   })
 
+  it('should include inject-manifest plugin by default', () => {
+    const plugins = ssrPlugin()
+    const injectManifestPlugin = plugins.find((p) => p.name === 'inject-manifest')
+    expect(injectManifestPlugin).toBeDefined()
+  })
+
   it('should exclude hot-reload plugin when disabled', () => {
     const plugins = ssrPlugin({ hotReload: false })
     const hotReloadPlugin = plugins.find((p) => p.name === 'vite-plugin-ssr-hot-reload')
@@ -50,8 +56,8 @@ describe('ssrPlugin', () => {
     const pluginsWithHotReload = ssrPlugin({ hotReload: true })
     const pluginsWithoutHotReload = ssrPlugin({ hotReload: false })
 
-    expect(pluginsWithHotReload.length).toBe(3)
-    expect(pluginsWithoutHotReload.length).toBe(2)
+    expect(pluginsWithHotReload.length).toBe(4)
+    expect(pluginsWithoutHotReload.length).toBe(3)
   })
 
   it('should pass hot-reload options', () => {

@@ -4,3 +4,4 @@ dist
 dist-server
 *.tgz
 .wrangler
+.claude/settings.local.json
