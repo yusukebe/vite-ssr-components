@@ -12,18 +12,11 @@ export const loadManifest = (): Manifest | undefined => {
     }
   }
 
-  // Auto-detect: Search through dist directory hierarchy up to 3 levels deep
-  const MANIFEST = import.meta.glob<{ default: Manifest }>(
-    [
-      '/dist/.vite/manifest.json',
-      '/dist/*/.vite/manifest.json',
-      '/dist/*/*/.vite/manifest.json',
-      '/dist/*/*/*/.vite/manifest.json',
-    ],
-    {
-      eager: true,
-    }
-  )
+  // Placeholder replaced by inject-manifest plugin during SSR build
+  const MANIFEST = '__VITE_MANIFEST_CONTENT__' as unknown as Record<
+    string,
+    { default: Manifest }
+  >
 
   let manifestData = {}
   for (const [, manifestFile] of Object.entries(MANIFEST)) {
