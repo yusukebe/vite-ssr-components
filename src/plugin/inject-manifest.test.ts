@@ -1,14 +1,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import injectManifest from './inject-manifest.js'
 import fs from 'node:fs'
 import path from 'node:path'
+import injectManifest from './inject-manifest.js'
 
 vi.mock('node:fs')
 vi.mock('node:path')
 
 describe('injectManifest', () => {
   beforeEach(() => {
-    vi.mocked(path.resolve).mockImplementation((...args) => args.join('/'))
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    vi.mocked(path.resolve).mockImplementation((...args: string[]) => args.join('/'))
   })
 
   afterEach(() => {
@@ -92,6 +93,7 @@ describe('injectManifest', () => {
 
     // Call config to set custom outDir
     if (typeof plugin.config === 'function') {
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       plugin.config(
         {
           environments: {
@@ -109,6 +111,7 @@ describe('injectManifest', () => {
     const code = 'const MANIFEST = "__VITE_MANIFEST_CONTENT__"'
 
     if (typeof plugin.transform === 'function') {
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       plugin.transform.call({} as never, code, 'test.js', { ssr: true })
     }
 
