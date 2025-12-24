@@ -13,10 +13,7 @@ export const loadManifest = (): Manifest | undefined => {
   }
 
   // Placeholder replaced by inject-manifest plugin during SSR build
-  const MANIFEST = '__VITE_MANIFEST_CONTENT__' as unknown as Record<
-    string,
-    { default: Manifest }
-  >
+  const MANIFEST = '__VITE_MANIFEST_CONTENT__' as unknown as Record<string, { default: Manifest }>
 
   let manifestData = {}
   for (const [, manifestFile] of Object.entries(MANIFEST)) {
