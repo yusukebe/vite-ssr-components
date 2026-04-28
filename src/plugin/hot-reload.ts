@@ -57,7 +57,9 @@ export default function ssrHotReload(options: Options = {}): Plugin {
     },
 
     handleHotUpdate({ server, file }) {
-      if (!file) return
+      if (!file) {
+        return
+      }
 
       if (isMatch(file)) {
         server.hot.send({ type: 'full-reload' })
@@ -74,10 +76,14 @@ export default function ssrHotReload(options: Options = {}): Plugin {
     }
 
     const collect = (outDir: unknown): void => {
-      if (typeof outDir !== 'string' || outDir.length === 0) return
+      if (typeof outDir !== 'string' || outDir.length === 0) {
+        return
+      }
       const abs = path.isAbsolute(outDir) ? outDir : path.resolve(root, outDir)
       const rel = normalizePath(path.relative(root, abs))
-      if (rel.length === 0 || rel.startsWith('..') || path.isAbsolute(rel)) return
+      if (rel.length === 0 || rel.startsWith('..') || path.isAbsolute(rel)) {
+        return
+      }
       result.push(rel)
     }
 

@@ -5,7 +5,12 @@ import { parse as babelParse } from '@babel/parser'
 import type * as BabelParser from '@babel/parser'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import fs from 'node:fs'
-import { autoEntry } from './auto-entry.js'
+import { autoEntry, extractEntriesFromAST } from './auto-entry.js'
+
+const DEFAULT_COMPONENTS = [
+  { name: 'Script', attribute: 'src' },
+  { name: 'Link', attribute: 'href' },
+]
 
 // Mock fs module
 vi.mock('node:fs', () => ({
@@ -67,7 +72,7 @@ describe('autoEntry plugin', () => {
 
     // Mock file contents with Script and Link components
     const indexTsxContent = `
-      import { Script, Link } from 'ssr-components'
+      import { Script, Link } from 'vite-ssr-components/react'
       export default function App() {
         return (
           <html>
@@ -145,7 +150,7 @@ describe('autoEntry plugin', () => {
 
     // Mock file contents with custom components
     const appTsxContent = `
-      import { CustomScript, CustomLink } from 'ssr-components'
+      import { CustomScript, CustomLink } from 'vite-ssr-components/react'
       export default function App() {
         return (
           <html>
@@ -198,7 +203,7 @@ describe('autoEntry plugin', () => {
 
     // Mock file contents
     const mainTsxContent = `
-      import { Script } from 'ssr-components'
+      import { Script } from 'vite-ssr-components/react'
       export default function App() {
         return <Script src="/src/client.tsx" />
       }
@@ -235,7 +240,7 @@ describe('autoEntry plugin', () => {
 
     // Mock file contents with same Script src
     const pageContent = `
-      import { Script } from 'ssr-components'
+      import { Script } from 'vite-ssr-components/react'
       export default function Page() {
         return <Script src="/src/client.tsx" />
       }
@@ -271,7 +276,7 @@ describe('autoEntry plugin', () => {
 
     // Mock file contents with invalid syntax
     const invalidContent = `
-      import { Script } from 'ssr-components'
+      import { Script } from 'vite-ssr-components/react'
       export default function App() {
         return <Script src="/src/client.tsx" />
       // Missing closing brace
@@ -385,7 +390,7 @@ describe('autoEntry plugin', () => {
 
     // Mock file contents
     const appContent = `
-      import { Script } from 'ssr-components'
+      import { Script } from 'vite-ssr-components/react'
       export default function App() {
         return <Script src="/src/client.tsx" />
       }
@@ -457,7 +462,7 @@ describe('autoEntry plugin', () => {
 
     // Mock file contents with multiple Script and Link components
     const layoutContent = `
-      import { Script, Link } from 'ssr-components'
+      import { Script, Link } from 'vite-ssr-components/react'
       export default function Layout() {
         return (
           <html>
@@ -505,7 +510,7 @@ describe('autoEntry plugin', () => {
         { name: 'app.tsx', isDirectory: () => false, isFile: () => true },
       ] as any)
       mockReadFileSync.mockReturnValue(`
-        import { Script } from 'ssr-components'
+        import { Script } from 'vite-ssr-components/react'
         export default function App() {
           return <Script src="${src}" />
         }
@@ -632,7 +637,7 @@ describe('autoEntry plugin', () => {
    */
   describe('default scan range and exclusions', () => {
     const scriptOnlyContent = `
-      import { Script } from 'ssr-components'
+      import { Script } from 'vite-ssr-components/react'
       export default function Page() {
         return <Script src="/app/client.tsx" />
       }
@@ -675,12 +680,12 @@ describe('autoEntry plugin', () => {
       mockReadFileSync.mockImplementation((filePath: any) => {
         if (String(filePath).includes('lib/shared.tsx')) {
           return `
-            import { Link } from 'ssr-components'
+            import { Link } from 'vite-ssr-components/react'
             export const Head = () => <Link href="/lib/style.css" rel="stylesheet" />
           `
         }
         return `
-          import { Script } from 'ssr-components'
+          import { Script } from 'vite-ssr-components/react'
           export default function Home() {
             return <Script src="/pages/home-client.tsx" />
           }
@@ -772,7 +777,7 @@ describe('autoEntry plugin', () => {
       mockReadFileSync.mockImplementation((filePath: any) => {
         if (String(filePath).endsWith('page.tsx')) {
           return `
-            import { Script } from 'ssr-components'
+            import { Script } from 'vite-ssr-components/react'
             export default function Page() {
               return <Script src="/app/client.tsx" />
             }
@@ -819,14 +824,14 @@ describe('autoEntry plugin', () => {
       mockReadFileSync.mockImplementation((filePath: any) => {
         if (String(filePath).includes('app/page.tsx')) {
           return `
-            import { Script } from 'ssr-components'
+            import { Script } from 'vite-ssr-components/react'
             export default function Page() {
               return <Script src="/app/should-not-be-detected.tsx" />
             }
           `
         }
         return `
-          import { Script } from 'ssr-components'
+          import { Script } from 'vite-ssr-components/react'
           export default function Main() {
             return <Script src="/src/main-client.tsx" />
           }
@@ -873,7 +878,7 @@ describe('autoEntry plugin - manifest loading', () => {
 
     // Mock file contents with Script component to trigger client build
     const appContent = `
-      import { Script } from 'ssr-components'
+      import { Script } from 'vite-ssr-components/react'
       export default function App() {
         return <Script src="/src/client.tsx" />
       }
@@ -891,5 +896,100 @@ describe('autoEntry plugin - manifest loading', () => {
     }
 
     expect(mockConfig.define['import.meta.env.VITE_MANIFEST_CONTENT']).toBeDefined()
+  })
+})
+
+/**
+ * Detection must be import-aware so that same-named components from unrelated
+ * packages (e.g. `@inertiajs/react`'s `<Link>` for client-side navigation, or
+ * `next/script`) are not mistakenly treated as SSR build entries. Only JSX
+ * elements whose tag resolves back to a named import from `vite-ssr-components`
+ * (or one of its subpath exports) should be picked up.
+ */
+describe('extractEntriesFromAST - import-aware detection', () => {
+  it('detects entries when components are imported from vite-ssr-components/react', () => {
+    const code = `
+      import { Script, Link } from 'vite-ssr-components/react'
+      export default function App() {
+        return (
+          <>
+            <Script src="/src/client.tsx" />
+            <Link href="/src/style.css" />
+          </>
+        )
+      }
+    `
+    expect(extractEntriesFromAST(code, DEFAULT_COMPONENTS)).toEqual([
+      '/src/client.tsx',
+      '/src/style.css',
+    ])
+  })
+
+  it('detects entries from any vite-ssr-components subpath (e.g. /hono)', () => {
+    const code = `
+      import { Script } from 'vite-ssr-components/hono'
+      export default () => <Script src="/src/hono-client.tsx" />
+    `
+    expect(extractEntriesFromAST(code, DEFAULT_COMPONENTS)).toEqual(['/src/hono-client.tsx'])
+  })
+
+  it('resolves aliased named imports back to the original component name', () => {
+    const code = `
+      import { Link as L, Script as S } from 'vite-ssr-components/react'
+      export default () => (
+        <>
+          <L href="/src/style.css" />
+          <S src="/src/client.tsx" />
+        </>
+      )
+    `
+    expect(extractEntriesFromAST(code, DEFAULT_COMPONENTS)).toEqual([
+      '/src/style.css',
+      '/src/client.tsx',
+    ])
+  })
+
+  it('ignores <Link> imported from a foreign package like @inertiajs/react', () => {
+    const code = `
+      import { Link } from '@inertiajs/react'
+      export default () => <Link href="/users">Users</Link>
+    `
+    expect(extractEntriesFromAST(code, DEFAULT_COMPONENTS)).toEqual([])
+  })
+
+  it('ignores <Script> imported as a default import from a foreign package like next/script', () => {
+    const code = `
+      import Script from 'next/script'
+      export default () => <Script src="https://example.com/x.js" />
+    `
+    expect(extractEntriesFromAST(code, DEFAULT_COMPONENTS)).toEqual([])
+  })
+
+  it('only picks up the vite-ssr-components import when both packages are imported with aliases', () => {
+    const code = `
+      import { Link as SsrLink } from 'vite-ssr-components/react'
+      import { Link as NavLink } from '@inertiajs/react'
+      export default () => (
+        <>
+          <NavLink href="/users">Users</NavLink>
+          <SsrLink href="/src/style.css" />
+        </>
+      )
+    `
+    expect(extractEntriesFromAST(code, DEFAULT_COMPONENTS)).toEqual(['/src/style.css'])
+  })
+
+  it('returns no entries when no vite-ssr-components import is present', () => {
+    const code = `
+      import { Link } from '@inertiajs/react'
+      import Script from 'next/script'
+      export default () => (
+        <>
+          <Script src="https://example.com/x.js" />
+          <Link href="/users">Users</Link>
+        </>
+      )
+    `
+    expect(extractEntriesFromAST(code, DEFAULT_COMPONENTS)).toEqual([])
   })
 })

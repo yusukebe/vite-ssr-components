@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-non-null-assertion */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/prefer-nullish-coalescing */
 /* eslint-disable @typescript-eslint/no-unnecessary-condition */
@@ -137,8 +136,6 @@ async function scanFiles(
   detectedEntries: Set<string>,
   excludedDirs: Set<string>
 ): Promise<void> {
-  const componentNames = components.map((c) => c.name)
-
   async function scan(currentDir: string): Promise<void> {
     try {
       const entries = await fs.promises.readdir(currentDir, { withFileTypes: true })
@@ -147,9 +144,13 @@ async function scanFiles(
         const fullPath = path.join(currentDir, entry.name)
 
         if (entry.isDirectory()) {
-          if (entry.name.startsWith('.')) continue
+          if (entry.name.startsWith('.')) {
+            continue
+          }
           const relDir = normalizePath(path.relative(root, fullPath))
-          if (excludedDirs.has(relDir)) continue
+          if (excludedDirs.has(relDir)) {
+            continue
+          }
           await scan(fullPath)
         } else if (entry.isFile()) {
           const relativePath = normalizePath(path.relative(root, fullPath))
@@ -158,7 +159,11 @@ async function scanFiles(
           if (matcher(relativePath)) {
             try {
               const code = fs.readFileSync(fullPath, 'utf-8')
-              if (!componentNames.some((n) => code.includes(n))) continue
+              // Only files that import from `vite-ssr-components` can possibly
+              // contribute entries, so skip the AST parse otherwise.
+              if (!code.includes('vite-ssr-components')) {
+                continue
+              }
               const entries = extractEntriesFromAST(code, components)
               entries.forEach((entry) => detectedEntries.add(entry))
             } catch (error) {
@@ -183,10 +188,14 @@ function collectExcludedDirs(config: { root: string }): Set<string> {
   const root = config.root
 
   const collect = (outDir: unknown): void => {
-    if (typeof outDir !== 'string' || outDir.length === 0) return
+    if (typeof outDir !== 'string' || outDir.length === 0) {
+      return
+    }
     const abs = path.isAbsolute(outDir) ? outDir : path.resolve(root, outDir)
     const rel = normalizePath(path.relative(root, abs))
-    if (rel.length === 0 || rel.startsWith('..') || path.isAbsolute(rel)) return
+    if (rel.length === 0 || rel.startsWith('..') || path.isAbsolute(rel)) {
+      return
+    }
     excluded.add(rel)
   }
 
@@ -225,7 +234,7 @@ function normalizeGlobPattern(pattern: string, root: string): string {
   return normalized
 }
 
-function extractEntriesFromAST(code: string, components: Component[]): string[] {
+export function extractEntriesFromAST(code: string, components: Component[]): string[] {
   const entries: string[] = []
 
   try {
@@ -235,37 +244,69 @@ function extractEntriesFromAST(code: string, components: Component[]): string[] 
       plugins: ['jsx', 'typescript'],
     })
 
-    // Create a map for quick lookup
+    // First pass: collect named imports from `vite-ssr-components*` so we can
+    // distinguish our `<Script>` / `<Link>` from same-named components in
+    // unrelated packages (e.g. `@inertiajs/react`'s `<Link>`).
+    // Map: local identifier name -> original imported name.
+    const ssrLocalNames = new Map<string, string>()
+    traverse(ast, {
+      ImportDeclaration(path) {
+        const source = path.node.source.value
+        if (typeof source !== 'string' || !source.startsWith('vite-ssr-components')) {
+          return
+        }
+        for (const spec of path.node.specifiers) {
+          if (spec.type !== 'ImportSpecifier') {
+            continue
+          }
+          if (spec.imported.type !== 'Identifier') {
+            continue
+          }
+          ssrLocalNames.set(spec.local.name, spec.imported.name)
+        }
+      },
+    })
+
+    // No relevant imports -> nothing to do.
+    if (ssrLocalNames.size === 0) {
+      return entries
+    }
+
+    // Map of imported (original) name -> attribute to read.
     const componentMap = new Map<string, string>()
     components.forEach((comp) => {
       componentMap.set(comp.name, comp.attribute)
     })
 
-    // Traverse the AST to find JSX elements
+    // Second pass: walk JSX and only consider elements whose tag resolves to
+    // an identifier we imported from vite-ssr-components.
     traverse(ast, {
       JSXElement(path) {
-        const element = path.node
-        const openingElement = element.openingElement
+        const openingElement = path.node.openingElement
+        if (openingElement.name.type !== 'JSXIdentifier') {
+          return
+        }
 
-        // Check if this is one of our target components
-        if (
-          openingElement.name.type === 'JSXIdentifier' &&
-          componentMap.has(openingElement.name.name)
-        ) {
-          const targetAttribute = componentMap.get(openingElement.name.name)!
+        const importedName = ssrLocalNames.get(openingElement.name.name)
+        if (importedName === undefined) {
+          return
+        }
 
-          // Look for the specific attribute for this component
-          for (const attr of openingElement.attributes) {
-            if (
-              attr.type === 'JSXAttribute' &&
-              attr.name.type === 'JSXIdentifier' &&
-              attr.name.name === targetAttribute &&
-              attr.value?.type === 'StringLiteral'
-            ) {
-              const value = attr.value.value
-              if (value) {
-                entries.push(value)
-              }
+        const targetAttribute = componentMap.get(importedName)
+        if (targetAttribute === undefined) {
+          return
+        }
+
+        for (const attr of openingElement.attributes) {
+          if (
+            attr.type === 'JSXAttribute' &&
+            attr.name.type === 'JSXIdentifier' &&
+            attr.name.name === targetAttribute &&
+            attr.value?.type === 'StringLiteral'
+          ) {
+            const value = attr.value.value
+            if (value) {
+              entries.push(value)
             }
           }
         }
