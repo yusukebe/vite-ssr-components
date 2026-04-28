@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { Script, Link, ViteClient, ReactRefresh } from '../../../src/react'
+import { Script, Link, ViteClient, ReactRefresh } from 'vite-ssr-components/react'
 import { renderToReadableStream } from 'react-dom/server'
 
 const app = new Hono()
