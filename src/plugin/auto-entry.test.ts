@@ -5,7 +5,8 @@ import { parse as babelParse } from '@babel/parser'
 import type * as BabelParser from '@babel/parser'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import fs from 'node:fs'
-import { autoEntry, extractEntriesFromAST } from './auto-entry.js'
+import path from 'node:path'
+import { autoEntry, extractEntriesFromAST, makeStrictIsSsrSource } from './auto-entry.js'
 
 const DEFAULT_COMPONENTS = [
   { name: 'Script', attribute: 'src' },
@@ -991,5 +992,72 @@ describe('extractEntriesFromAST - import-aware detection', () => {
       )
     `
     expect(extractEntriesFromAST(code, DEFAULT_COMPONENTS)).toEqual([])
+  })
+
+  it('honors a custom isSsrSource predicate (matches a workspace alias)', () => {
+    const code = `
+      import { Script } from '@my/ssr'
+      export default () => <Script src="/src/client.tsx" />
+    `
+    const isSsrSource = (s: string) => s === '@my/ssr'
+    expect(extractEntriesFromAST(code, DEFAULT_COMPONENTS, isSsrSource)).toEqual([
+      '/src/client.tsx',
+    ])
+  })
+
+  it('rejects the canonical name when a custom predicate excludes it', () => {
+    const code = `
+      import { Script } from 'vite-ssr-components/react'
+      export default () => <Script src="/src/client.tsx" />
+    `
+    const isSsrSource = () => false
+    expect(extractEntriesFromAST(code, DEFAULT_COMPONENTS, isSsrSource)).toEqual([])
+  })
+})
+
+/**
+ * Strict-mode predicate. When the package can be resolved from the project
+ * root, scanFiles passes a predicate that recognises:
+ *  - canonical name imports
+ *  - relative imports that resolve into the package directory
+ *  - bare specifiers under another name that resolve to the same package
+ *    (workspace alias / link)
+ *
+ * The bare-specifier branch is exercised through the integration path; here we
+ * cover the deterministic, fs-free rules.
+ */
+describe('makeStrictIsSsrSource', () => {
+  const pkgDir = path.resolve('/abs/repo/node_modules/vite-ssr-components')
+  const importerFile = path.resolve('/abs/repo/src/page.tsx')
+  const isSsr = makeStrictIsSsrSource(importerFile, pkgDir)
+
+  it('accepts the canonical bare name', () => {
+    expect(isSsr('vite-ssr-components')).toBe(true)
+  })
+
+  it('accepts canonical subpath imports', () => {
+    expect(isSsr('vite-ssr-components/react')).toBe(true)
+    expect(isSsr('vite-ssr-components/hono')).toBe(true)
+  })
+
+  it('rejects names that merely start with vite-ssr-components- but are different packages', () => {
+    expect(isSsr('vite-ssr-components-extra')).toBe(false)
+  })
+
+  it('accepts relative imports that resolve into pkgDir', () => {
+    const deepImporter = path.join(pkgDir, 'src', 'plugin', 'auto-entry.ts')
+    const innerIsSsr = makeStrictIsSsrSource(deepImporter, pkgDir)
+    expect(innerIsSsr('./other.ts')).toBe(true)
+    expect(innerIsSsr('../react/index.ts')).toBe(true)
+  })
+
+  it('rejects relative imports that escape pkgDir', () => {
+    expect(isSsr('./components/foo.ts')).toBe(false)
+    expect(isSsr('../../elsewhere/util.ts')).toBe(false)
+  })
+
+  it('rejects unrelated bare specifiers that fail to resolve', () => {
+    expect(isSsr('@inertiajs/react')).toBe(false)
+    expect(isSsr('next/script')).toBe(false)
   })
 })

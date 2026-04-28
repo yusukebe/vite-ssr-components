@@ -291,11 +291,35 @@ The plugin automatically scans your source files to detect Script/Link component
 **How it works:**
 
 1. **File Scanning**: The plugin scans files matching the specified patterns (default: `**/*.{tsx,ts}`, excluding `node_modules`, `dist`, `build`, `out`, `coverage`, dotfile dirs, and any configured `build.outDir`)
-2. **Substring Prefilter**: Files that don't even mention any configured component name are skipped before the AST parser runs
+2. **Substring Prefilter**: Files that don't even mention `vite-ssr-components` are skipped before the AST parser runs
 3. **AST Analysis**: Remaining files are parsed and analyzed to find JSX components
-4. **Component Detection**: Components matching the configured names are detected
+4. **Import-aware Detection**: Only `<Script>` / `<Link>` (or your custom components) imported from `vite-ssr-components` are picked up. Same-named components from other packages (e.g. `@inertiajs/react`'s `<Link>`, `next/script`) are ignored.
 5. **Attribute Extraction**: File paths are extracted from the specified attributes
 6. **Build Configuration**: Detected files are automatically added to Vite's build input
+
+**Resolving the package**
+
+When `vite-ssr-components` is installed normally, the plugin also accepts the
+following two import shapes as belonging to the package:
+
+- Relative imports that resolve to a file inside the on-disk package directory
+  (useful in monorepos that reach into the package via `../../`)
+- Bare specifiers under another name (e.g. `@my/ssr`) whose resolved
+  `package.json` directory matches `vite-ssr-components` — covers workspace
+  links / aliases that point at the same package on disk
+
+**Not supported**
+
+The following import shapes are **not** detected, because resolving them
+requires Vite's full resolver pipeline (which isn't available at the point
+where auto-entry runs):
+
+- `tsconfig.json` `paths` aliases (e.g. `@/components/Script`)
+- Vite `resolve.alias` entries
+
+If you rely on either, import the components via the canonical
+`vite-ssr-components/<entry>` specifier in the files you want auto-entry to
+scan.
 
 > Detected `src` / `href` values are normalized to project-relative paths, so leading-slash forms like `<Script src="/src/client.tsx" />` are accepted by both rollup and Vite 8 / rolldown.
 

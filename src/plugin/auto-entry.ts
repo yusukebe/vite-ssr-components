@@ -7,6 +7,7 @@ import picomatch from 'picomatch'
 import type { Plugin } from 'vite'
 import { normalizePath } from 'vite'
 import fs from 'node:fs'
+import { createRequire } from 'node:module'
 import path from 'node:path'
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
@@ -48,9 +49,16 @@ export function autoEntry(options: EntryOptions = {}): Plugin {
 
       const excludedDirs = collectExcludedDirs(config)
 
+      // Resolve the on-disk location of the `vite-ssr-components` package once
+      // so per-file detection can verify imports resolve back into it. Returns
+      // null when the package can't be located or when the project root *is*
+      // the package itself (so we don't over-match relative imports during
+      // self-development).
+      const pkgDir = resolveSsrPackageDir(config.root)
+
       // Scan files and detect entries
       const detectedEntries = new Set<string>()
-      await scanFiles(config.root, matcher, components, detectedEntries, excludedDirs)
+      await scanFiles(config.root, matcher, components, detectedEntries, excludedDirs, pkgDir)
 
       // Apply detected entries to config if any found
       if (detectedEntries.size > 0) {
@@ -134,7 +142,8 @@ async function scanFiles(
   matcher: (file: string) => boolean,
   components: Component[],
   detectedEntries: Set<string>,
-  excludedDirs: Set<string>
+  excludedDirs: Set<string>,
+  pkgDir: string | null
 ): Promise<void> {
   async function scan(currentDir: string): Promise<void> {
     try {
@@ -159,12 +168,15 @@ async function scanFiles(
           if (matcher(relativePath)) {
             try {
               const code = fs.readFileSync(fullPath, 'utf-8')
-              // Only files that import from `vite-ssr-components` can possibly
-              // contribute entries, so skip the AST parse otherwise.
+              // Only files that mention `vite-ssr-components` somewhere can
+              // possibly contribute entries, so skip the AST parse otherwise.
+              // (Workspace aliases that never spell the canonical name are
+              // intentionally not supported — see README.)
               if (!code.includes('vite-ssr-components')) {
                 continue
               }
-              const entries = extractEntriesFromAST(code, components)
+              const isSsrSource = pkgDir ? makeStrictIsSsrSource(fullPath, pkgDir) : undefined
+              const entries = extractEntriesFromAST(code, components, isSsrSource)
               entries.forEach((entry) => detectedEntries.add(entry))
             } catch (error) {
               // Ignore files that can't be read or parsed
@@ -179,6 +191,72 @@ async function scanFiles(
   }
 
   await scan(root)
+}
+
+/**
+ * Locate the on-disk `vite-ssr-components` package directory from the project
+ * root. Returns null when:
+ * - the package is not installed (auto-entry then falls back to a simple
+ *   `startsWith('vite-ssr-components')` check on import sources)
+ * - the resolved directory equals `root` itself, i.e. we're inside the
+ *   package's own repo. Otherwise strict mode would treat every relative
+ *   import inside the package as an SSR import.
+ */
+function resolveSsrPackageDir(root: string): string | null {
+  try {
+    const r = createRequire(path.join(root, 'noop.js'))
+    const pkgDir = path.dirname(r.resolve('vite-ssr-components/package.json'))
+    if (normalizePath(pkgDir) === normalizePath(root)) {
+      return null
+    }
+    return pkgDir
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Build an import-source predicate that accepts a source iff it ultimately
+ * resolves to (or sits inside) the `vite-ssr-components` package directory.
+ *
+ *  1. Canonical name (`vite-ssr-components` or `vite-ssr-components/...`).
+ *  2. Relative path that resolves to a file inside `pkgDir` — covers monorepos
+ *     where source files reach into the package via `../../`.
+ *  3. Bare specifier under a different name (e.g. `@my/ssr`) whose package
+ *     directory is the same as `pkgDir` — covers workspace links / aliases.
+ *
+ * tsconfig `paths` and Vite `resolve.alias` are not handled because resolving
+ * them requires Vite's resolver pipeline, which isn't accessible from
+ * `configResolved`.
+ */
+export function makeStrictIsSsrSource(
+  importerFile: string,
+  pkgDir: string
+): (source: string) => boolean {
+  return (source) => {
+    if (source === 'vite-ssr-components' || source.startsWith('vite-ssr-components/')) {
+      return true
+    }
+    if (source.startsWith('./') || source.startsWith('../')) {
+      const resolved = path.resolve(path.dirname(importerFile), source)
+      return resolved === pkgDir || resolved.startsWith(pkgDir + path.sep)
+    }
+    // Bare specifier with a different name — try to resolve its package.json
+    // and compare to pkgDir (catches workspace-linked aliases).
+    if (!source.startsWith('/') && !source.startsWith('.')) {
+      try {
+        const r = createRequire(importerFile)
+        const pkgName = source.startsWith('@')
+          ? source.split('/').slice(0, 2).join('/')
+          : source.split('/')[0]
+        const otherPkgJson = r.resolve(`${pkgName}/package.json`)
+        return path.dirname(otherPkgJson) === pkgDir
+      } catch {
+        return false
+      }
+    }
+    return false
+  }
 }
 
 function collectExcludedDirs(config: { root: string }): Set<string> {
@@ -234,7 +312,11 @@ function normalizeGlobPattern(pattern: string, root: string): string {
   return normalized
 }
 
-export function extractEntriesFromAST(code: string, components: Component[]): string[] {
+export function extractEntriesFromAST(
+  code: string,
+  components: Component[],
+  isSsrSource: (source: string) => boolean = (s) => s.startsWith('vite-ssr-components')
+): string[] {
   const entries: string[] = []
 
   try {
@@ -244,15 +326,16 @@ export function extractEntriesFromAST(code: string, components: Component[]): st
       plugins: ['jsx', 'typescript'],
     })
 
-    // First pass: collect named imports from `vite-ssr-components*` so we can
-    // distinguish our `<Script>` / `<Link>` from same-named components in
-    // unrelated packages (e.g. `@inertiajs/react`'s `<Link>`).
+    // First pass: collect named imports whose source is recognised as
+    // belonging to vite-ssr-components, so we can distinguish our
+    // `<Script>` / `<Link>` from same-named components in unrelated packages
+    // (e.g. `@inertiajs/react`'s `<Link>`).
     // Map: local identifier name -> original imported name.
     const ssrLocalNames = new Map<string, string>()
     traverse(ast, {
       ImportDeclaration(path) {
         const source = path.node.source.value
-        if (typeof source !== 'string' || !source.startsWith('vite-ssr-components')) {
+        if (typeof source !== 'string' || !isSsrSource(source)) {
           return
         }
         for (const spec of path.node.specifiers) {
