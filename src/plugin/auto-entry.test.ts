@@ -84,8 +84,8 @@ describe('autoEntry plugin', () => {
     expect(mockConfig.environments.client.build.manifest).toBe(true)
     // @ts-expect-error - Dynamic properties created by plugin
     expect(mockConfig.environments.client.build.rollupOptions.input).toEqual([
-      '/src/client.tsx',
-      '/src/style.css',
+      'src/client.tsx',
+      'src/style.css',
     ])
   })
 
@@ -157,8 +157,8 @@ describe('autoEntry plugin', () => {
     // Verify that custom entries were detected and configured
     // @ts-expect-error - Dynamic properties created by plugin
     expect(mockConfig.environments.client.build.rollupOptions.input).toEqual([
-      '/src/app.js',
-      '/src/main.css',
+      'src/app.js',
+      'src/main.css',
     ])
   })
 
@@ -202,7 +202,7 @@ describe('autoEntry plugin', () => {
 
     // Verify that only app/**/*.tsx files were processed and entries detected
     // @ts-expect-error - Dynamic properties created by plugin
-    expect(mockConfig.environments.client.build.rollupOptions.input).toEqual(['/src/client.tsx'])
+    expect(mockConfig.environments.client.build.rollupOptions.input).toEqual(['src/client.tsx'])
   })
 
   it('should deduplicate entries from multiple files', async () => {
@@ -239,7 +239,7 @@ describe('autoEntry plugin', () => {
 
     // Verify that duplicate entries were removed
     // @ts-expect-error - Dynamic properties created by plugin
-    expect(mockConfig.environments.client.build.rollupOptions.input).toEqual(['/src/client.tsx'])
+    expect(mockConfig.environments.client.build.rollupOptions.input).toEqual(['src/client.tsx'])
   })
 
   it('should handle parse errors gracefully', async () => {
@@ -389,8 +389,8 @@ describe('autoEntry plugin', () => {
 
     // Verify that existing input was merged with detected entries
     expect(mockConfig.environments.client.build.rollupOptions.input).toEqual([
-      '/existing/entry.js',
-      '/src/client.tsx',
+      'existing/entry.js',
+      'src/client.tsx',
     ])
   })
 
@@ -471,11 +471,143 @@ describe('autoEntry plugin', () => {
     // Verify that all entries were detected
     // @ts-expect-error - Dynamic properties created by plugin
     expect(mockConfig.environments.client.build.rollupOptions.input).toEqual([
-      '/src/reset.css',
-      '/src/main.css',
-      '/src/polyfills.js',
-      '/src/app.js',
+      'src/reset.css',
+      'src/main.css',
+      'src/polyfills.js',
+      'src/app.js',
     ])
+  })
+
+  /**
+   * Regression: Vite 8 / rolldown rejects leading-slash inputs as absolute FS
+   * paths. The plugin must normalize detected entries to project-relative
+   * paths and gracefully merge with whatever the upstream config has set
+   * (including the default `["/"]` placed by `@cloudflare/vite-plugin`).
+   */
+  describe('rolldown-compatible input normalization', () => {
+    const setupEntryDetection = (src: string) => {
+      mockReaddir.mockResolvedValueOnce([
+        { name: 'src', isDirectory: () => true, isFile: () => false },
+      ] as any)
+      mockReaddir.mockResolvedValueOnce([
+        { name: 'app.tsx', isDirectory: () => false, isFile: () => true },
+      ] as any)
+      mockReadFileSync.mockReturnValue(`
+        import { Script } from 'ssr-components'
+        export default function App() {
+          return <Script src="${src}" />
+        }
+      `)
+    }
+
+    it('strips a leading slash from detected entries', async () => {
+      setupEntryDetection('/foo.tsx')
+      const plugin = autoEntry()
+      const mockConfig: any = { root: '/mock/project', environments: {} }
+
+      if (plugin.configResolved) {
+        // @ts-expect-error - Testing plugin behavior with mock config
+        await plugin.configResolved(mockConfig)
+      }
+
+      expect(mockConfig.environments.client.build.rollupOptions.input).toEqual(['foo.tsx'])
+    })
+
+    it('drops the default ["/"] placeholder when merging with detected entries', async () => {
+      setupEntryDetection('/foo.tsx')
+      const plugin = autoEntry()
+      const mockConfig: any = {
+        root: '/mock/project',
+        environments: {
+          client: {
+            build: {
+              rollupOptions: { input: ['/'] },
+            },
+          },
+        },
+      }
+
+      if (plugin.configResolved) {
+        // @ts-expect-error - Testing plugin behavior with mock config
+        await plugin.configResolved(mockConfig)
+      }
+
+      expect(mockConfig.environments.client.build.rollupOptions.input).toEqual(['foo.tsx'])
+    })
+
+    it('preserves user-provided array inputs alongside detected entries', async () => {
+      setupEntryDetection('/foo.tsx')
+      const plugin = autoEntry()
+      const mockConfig: any = {
+        root: '/mock/project',
+        environments: {
+          client: {
+            build: {
+              rollupOptions: { input: ['src/main.ts'] },
+            },
+          },
+        },
+      }
+
+      if (plugin.configResolved) {
+        // @ts-expect-error - Testing plugin behavior with mock config
+        await plugin.configResolved(mockConfig)
+      }
+
+      expect(mockConfig.environments.client.build.rollupOptions.input).toEqual([
+        'src/main.ts',
+        'foo.tsx',
+      ])
+    })
+
+    it('leaves existing input untouched when no entries are detected', async () => {
+      mockReaddir.mockResolvedValueOnce([
+        { name: 'src', isDirectory: () => true, isFile: () => false },
+      ] as any)
+      mockReaddir.mockResolvedValueOnce([
+        { name: 'plain.tsx', isDirectory: () => false, isFile: () => true },
+      ] as any)
+      // No Script/Link components -> no detected entries
+      mockReadFileSync.mockReturnValue(`
+        export default function Plain() {
+          return <div>nothing to detect</div>
+        }
+      `)
+
+      const plugin = autoEntry()
+      const originalInput = ['/']
+      const mockConfig: any = {
+        root: '/mock/project',
+        environments: {
+          client: {
+            build: {
+              rollupOptions: { input: originalInput },
+            },
+          },
+        },
+      }
+
+      if (plugin.configResolved) {
+        // @ts-expect-error - Testing plugin behavior with mock config
+        await plugin.configResolved(mockConfig)
+      }
+
+      expect(mockConfig.environments.client.build.rollupOptions.input).toBe(originalInput)
+      expect(mockConfig.environments.client.build.rollupOptions.input).toEqual(['/'])
+    })
+
+    it('still works for existing users who pass paths without a leading slash', async () => {
+      setupEntryDetection('src/client.tsx')
+      const plugin = autoEntry()
+      const mockConfig: any = { root: '/mock/project', environments: {} }
+
+      if (plugin.configResolved) {
+        // @ts-expect-error - Testing plugin behavior with mock config
+        await plugin.configResolved(mockConfig)
+      }
+
+      expect(mockConfig.environments.client.build.rollupOptions.input).toEqual(['src/client.tsx'])
+    })
   })
 })
 
