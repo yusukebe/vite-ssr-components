@@ -283,6 +283,8 @@ The plugin automatically scans your source files to detect Script/Link component
 4. **Attribute Extraction**: File paths are extracted from the specified attributes
 5. **Build Configuration**: Detected files are automatically added to Vite's build input
 
+> Detected `src` / `href` values are normalized to project-relative paths, so leading-slash forms like `<Script src="/src/client.tsx" />` are accepted by both rollup and Vite 8 / rolldown.
+
 **Example:**
 
 ```tsx

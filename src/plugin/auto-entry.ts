@@ -51,7 +51,19 @@ export function autoEntry(options: EntryOptions = {}): Plugin {
 
       // Apply detected entries to config if any found
       if (detectedEntries.size > 0) {
+        // Strip a leading slash so rolldown (Vite 8) does not treat the path as
+        // an absolute filesystem path. `<Script src="/src/client.tsx" />` is a
+        // browser-facing URL; the rollup input must be a project-relative path.
+        const normalize = (v: unknown): unknown =>
+          typeof v === 'string' ? v.replace(/^\/+/, '') : v
+
         const entriesArray = Array.from(detectedEntries)
+          .map((v) => normalize(v))
+          .filter((v): v is string => typeof v === 'string' && v.length > 0)
+
+        if (entriesArray.length === 0) {
+          return
+        }
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const viteConfig = config as any
@@ -90,12 +102,23 @@ export function autoEntry(options: EntryOptions = {}): Plugin {
         }
 
         const clientInput = clientBuild.rollupOptions.input
+        const dedup = <T>(arr: T[]): T[] => Array.from(new Set(arr))
 
         if (Array.isArray(clientInput)) {
-          clientBuild.rollupOptions.input = [...clientInput, ...entriesArray]
+          // Normalize and drop entries that collapse to "" (e.g. the default "/")
+          // so they do not poison the rollup input list.
+          const existing = clientInput
+            .map((v: unknown) => normalize(v))
+            .filter((v): v is string => typeof v === 'string' && v.length > 0)
+          clientBuild.rollupOptions.input = dedup([...existing, ...entriesArray])
         } else if (typeof clientInput === 'string') {
-          clientBuild.rollupOptions.input = [clientInput, ...entriesArray]
+          const existing = normalize(clientInput) as string
+          clientBuild.rollupOptions.input =
+            existing.length > 0 ? dedup([existing, ...entriesArray]) : entriesArray
         } else {
+          // TODO: clientInput may be a `Record<string, string>` (named input map);
+          // overwriting drops user-provided named entries. Merge if a real use
+          // case for object-form inputs surfaces.
           clientBuild.rollupOptions.input = entriesArray
         }
       }
