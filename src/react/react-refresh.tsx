@@ -3,7 +3,9 @@
 
 export const ReactRefresh = () => {
   // eslint-disable-next-line @typescript-eslint/prefer-optional-chain, @typescript-eslint/no-unnecessary-condition
-  if (import.meta.env && import.meta.env.PROD) return <></>
+  if (import.meta.env && import.meta.env.PROD) {
+    return <></>
+  }
   const refreshScript = `
     import RefreshRuntime from '/@react-refresh';
     RefreshRuntime.injectIntoGlobalHook(window);

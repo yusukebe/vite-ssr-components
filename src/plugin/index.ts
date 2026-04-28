@@ -30,8 +30,12 @@ export default function ssrPlugin(options: SSRPluginOptions = {}): Plugin[] {
     const hotReloadOptions: { target?: string | string[]; ignore?: string | string[] } = {}
 
     if (typeof hotReloadOption === 'object') {
-      if (hotReloadOption.target) hotReloadOptions.target = hotReloadOption.target
-      if (hotReloadOption.ignore) hotReloadOptions.ignore = hotReloadOption.ignore
+      if (hotReloadOption.target) {
+        hotReloadOptions.target = hotReloadOption.target
+      }
+      if (hotReloadOption.ignore) {
+        hotReloadOptions.ignore = hotReloadOption.ignore
+      }
     }
 
     plugins.push(hotReload(hotReloadOptions))

@@ -33,7 +33,9 @@ export default function injectManifest(): Plugin {
         // Manifest not found
       }
 
-      if (!manifestContent) return
+      if (!manifestContent) {
+        return
+      }
 
       // Replace placeholder string with actual manifest data
       // Format: { "__manifest__": { default: <manifest> } } to match the Object.entries loop
