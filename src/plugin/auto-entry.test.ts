@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { parse as babelParse } from '@babel/parser'
+import type * as BabelParser from '@babel/parser'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import fs from 'node:fs'
 import { autoEntry } from './auto-entry.js'
@@ -14,6 +16,16 @@ vi.mock('node:fs', () => ({
     readFileSync: vi.fn(),
   },
 }))
+
+// Wrap @babel/parser.parse so tests can spy on parse invocations while the
+// real implementation continues to drive entry detection.
+vi.mock('@babel/parser', async () => {
+  const actual = await vi.importActual<typeof BabelParser>('@babel/parser')
+  return {
+    ...actual,
+    parse: vi.fn(actual.parse),
+  }
+})
 
 /**
  * Tests for autoEntry plugin
@@ -607,6 +619,231 @@ describe('autoEntry plugin', () => {
       }
 
       expect(mockConfig.environments.client.build.rollupOptions.input).toEqual(['src/client.tsx'])
+    })
+  })
+
+  /**
+   * Default scan range was widened from `src/**\/*.{tsx,ts}` to
+   * `**\/*.{tsx,ts}` so users who keep SSR code under `app/`, `lib/`, `pages/`
+   * etc. can call `ssrPlugin()` with no arguments. The added scan cost is
+   * mitigated by (a) excluding common build/output directories from traversal
+   * and (b) skipping the AST parse for files that don't even substring-match
+   * any configured component name.
+   */
+  describe('default scan range and exclusions', () => {
+    const scriptOnlyContent = `
+      import { Script } from 'ssr-components'
+      export default function Page() {
+        return <Script src="/app/client.tsx" />
+      }
+    `
+
+    it('detects entries under app/ when only the default target is used', async () => {
+      mockReaddir
+        .mockResolvedValueOnce([
+          { name: 'app', isDirectory: () => true, isFile: () => false },
+        ] as any)
+        .mockResolvedValueOnce([
+          { name: 'index.tsx', isDirectory: () => false, isFile: () => true },
+        ] as any)
+      mockReadFileSync.mockReturnValue(scriptOnlyContent)
+
+      const plugin = autoEntry()
+      const mockConfig: any = { root: '/mock/project', environments: {} }
+
+      if (plugin.configResolved) {
+        // @ts-expect-error - Testing plugin behavior with mock config
+        await plugin.configResolved(mockConfig)
+      }
+
+      expect(mockConfig.environments.client.build.rollupOptions.input).toEqual(['app/client.tsx'])
+    })
+
+    it('detects entries under arbitrary top-level directories like lib/ and pages/', async () => {
+      mockReaddir
+        .mockResolvedValueOnce([
+          { name: 'lib', isDirectory: () => true, isFile: () => false },
+          { name: 'pages', isDirectory: () => true, isFile: () => false },
+        ] as any)
+        .mockResolvedValueOnce([
+          { name: 'shared.tsx', isDirectory: () => false, isFile: () => true },
+        ] as any)
+        .mockResolvedValueOnce([
+          { name: 'home.tsx', isDirectory: () => false, isFile: () => true },
+        ] as any)
+
+      mockReadFileSync.mockImplementation((filePath: any) => {
+        if (String(filePath).includes('lib/shared.tsx')) {
+          return `
+            import { Link } from 'ssr-components'
+            export const Head = () => <Link href="/lib/style.css" rel="stylesheet" />
+          `
+        }
+        return `
+          import { Script } from 'ssr-components'
+          export default function Home() {
+            return <Script src="/pages/home-client.tsx" />
+          }
+        `
+      })
+
+      const plugin = autoEntry()
+      const mockConfig: any = { root: '/mock/project', environments: {} }
+
+      if (plugin.configResolved) {
+        // @ts-expect-error - Testing plugin behavior with mock config
+        await plugin.configResolved(mockConfig)
+      }
+
+      expect(mockConfig.environments.client.build.rollupOptions.input).toEqual([
+        'lib/style.css',
+        'pages/home-client.tsx',
+      ])
+    })
+
+    it('does not recurse into the fixed-excluded `dist/` directory', async () => {
+      mockReaddir
+        .mockResolvedValueOnce([
+          { name: 'app', isDirectory: () => true, isFile: () => false },
+          { name: 'dist', isDirectory: () => true, isFile: () => false },
+        ] as any)
+        .mockResolvedValueOnce([
+          { name: 'index.tsx', isDirectory: () => false, isFile: () => true },
+        ] as any)
+
+      mockReadFileSync.mockReturnValue(scriptOnlyContent)
+
+      const plugin = autoEntry()
+      const mockConfig: any = { root: '/mock/project', environments: {} }
+
+      if (plugin.configResolved) {
+        // @ts-expect-error - Testing plugin behavior with mock config
+        await plugin.configResolved(mockConfig)
+      }
+
+      // readdir should be called only twice (root + app/), never for dist/.
+      expect(mockReaddir).toHaveBeenCalledTimes(2)
+      expect(mockReaddir.mock.calls.some((call) => String(call[0]).includes('dist'))).toBe(false)
+      expect(mockConfig.environments.client.build.rollupOptions.input).toEqual(['app/client.tsx'])
+    })
+
+    it('honors a custom build.outDir for dynamic dir exclusion', async () => {
+      mockReaddir
+        .mockResolvedValueOnce([
+          { name: 'app', isDirectory: () => true, isFile: () => false },
+          { name: 'custom-dist', isDirectory: () => true, isFile: () => false },
+        ] as any)
+        .mockResolvedValueOnce([
+          { name: 'index.tsx', isDirectory: () => false, isFile: () => true },
+        ] as any)
+
+      mockReadFileSync.mockReturnValue(scriptOnlyContent)
+
+      const plugin = autoEntry()
+      const mockConfig: any = {
+        root: '/mock/project',
+        environments: {},
+        build: { outDir: 'custom-dist' },
+      }
+
+      if (plugin.configResolved) {
+        // @ts-expect-error - Testing plugin behavior with mock config
+        await plugin.configResolved(mockConfig)
+      }
+
+      expect(mockReaddir.mock.calls.some((call) => String(call[0]).includes('custom-dist'))).toBe(
+        false
+      )
+      expect(mockConfig.environments.client.build.rollupOptions.input).toEqual(['app/client.tsx'])
+    })
+
+    it('skips the AST parse for files that contain no configured component names', async () => {
+      mockReaddir
+        .mockResolvedValueOnce([
+          { name: 'app', isDirectory: () => true, isFile: () => false },
+        ] as any)
+        .mockResolvedValueOnce([
+          { name: 'plain-a.tsx', isDirectory: () => false, isFile: () => true },
+          { name: 'plain-b.tsx', isDirectory: () => false, isFile: () => true },
+          { name: 'plain-c.tsx', isDirectory: () => false, isFile: () => true },
+          { name: 'page.tsx', isDirectory: () => false, isFile: () => true },
+        ] as any)
+
+      mockReadFileSync.mockImplementation((filePath: any) => {
+        if (String(filePath).endsWith('page.tsx')) {
+          return `
+            import { Script } from 'ssr-components'
+            export default function Page() {
+              return <Script src="/app/client.tsx" />
+            }
+          `
+        }
+        // No "Script" / "Link" substrings anywhere in these files.
+        return `
+          export default function Plain() {
+            return <div>nothing here</div>
+          }
+        `
+      })
+
+      const parseSpy = vi.mocked(babelParse)
+      parseSpy.mockClear()
+
+      const plugin = autoEntry()
+      const mockConfig: any = { root: '/mock/project', environments: {} }
+
+      if (plugin.configResolved) {
+        // @ts-expect-error - Testing plugin behavior with mock config
+        await plugin.configResolved(mockConfig)
+      }
+
+      // Only page.tsx should reach the AST parser; the three plain files are
+      // filtered out by the substring prefilter.
+      expect(parseSpy).toHaveBeenCalledTimes(1)
+      expect(mockConfig.environments.client.build.rollupOptions.input).toEqual(['app/client.tsx'])
+    })
+
+    it('uses the user-provided target verbatim and ignores the default', async () => {
+      mockReaddir
+        .mockResolvedValueOnce([
+          { name: 'app', isDirectory: () => true, isFile: () => false },
+          { name: 'src', isDirectory: () => true, isFile: () => false },
+        ] as any)
+        .mockResolvedValueOnce([
+          { name: 'page.tsx', isDirectory: () => false, isFile: () => true },
+        ] as any)
+        .mockResolvedValueOnce([
+          { name: 'main.tsx', isDirectory: () => false, isFile: () => true },
+        ] as any)
+
+      mockReadFileSync.mockImplementation((filePath: any) => {
+        if (String(filePath).includes('app/page.tsx')) {
+          return `
+            import { Script } from 'ssr-components'
+            export default function Page() {
+              return <Script src="/app/should-not-be-detected.tsx" />
+            }
+          `
+        }
+        return `
+          import { Script } from 'ssr-components'
+          export default function Main() {
+            return <Script src="/src/main-client.tsx" />
+          }
+        `
+      })
+
+      const plugin = autoEntry({ target: 'src/**/*.{tsx,ts}' })
+      const mockConfig: any = { root: '/mock/project', environments: {} }
+
+      if (plugin.configResolved) {
+        // @ts-expect-error - Testing plugin behavior with mock config
+        await plugin.configResolved(mockConfig)
+      }
+
+      expect(mockConfig.environments.client.build.rollupOptions.input).toEqual([
+        'src/main-client.tsx',
+      ])
     })
   })
 })

@@ -23,9 +23,11 @@ export interface EntryOptions {
   components?: Component[]
 }
 
+const FIXED_EXCLUDED_DIRS = ['node_modules', 'dist', 'build', 'out', 'coverage']
+
 export function autoEntry(options: EntryOptions = {}): Plugin {
   const {
-    target = 'src/**/*.{tsx,ts}',
+    target = '**/*.{tsx,ts}',
     components = [
       { name: 'Script', attribute: 'src' },
       { name: 'Link', attribute: 'href' },
@@ -45,9 +47,11 @@ export function autoEntry(options: EntryOptions = {}): Plugin {
       // Create matcher
       const matcher = picomatch(normalizedPatterns, { dot: true })
 
+      const excludedDirs = collectExcludedDirs(config)
+
       // Scan files and detect entries
       const detectedEntries = new Set<string>()
-      await scanFiles(config.root, matcher, components, detectedEntries)
+      await scanFiles(config.root, matcher, components, detectedEntries, excludedDirs)
 
       // Apply detected entries to config if any found
       if (detectedEntries.size > 0) {
@@ -130,8 +134,11 @@ async function scanFiles(
   root: string,
   matcher: (file: string) => boolean,
   components: Component[],
-  detectedEntries: Set<string>
+  detectedEntries: Set<string>,
+  excludedDirs: Set<string>
 ): Promise<void> {
+  const componentNames = components.map((c) => c.name)
+
   async function scan(currentDir: string): Promise<void> {
     try {
       const entries = await fs.promises.readdir(currentDir, { withFileTypes: true })
@@ -140,10 +147,10 @@ async function scanFiles(
         const fullPath = path.join(currentDir, entry.name)
 
         if (entry.isDirectory()) {
-          // Skip node_modules and other common directories
-          if (!entry.name.startsWith('.') && entry.name !== 'node_modules') {
-            await scan(fullPath)
-          }
+          if (entry.name.startsWith('.')) continue
+          const relDir = normalizePath(path.relative(root, fullPath))
+          if (excludedDirs.has(relDir)) continue
+          await scan(fullPath)
         } else if (entry.isFile()) {
           const relativePath = normalizePath(path.relative(root, fullPath))
 
@@ -151,6 +158,7 @@ async function scanFiles(
           if (matcher(relativePath)) {
             try {
               const code = fs.readFileSync(fullPath, 'utf-8')
+              if (!componentNames.some((n) => code.includes(n))) continue
               const entries = extractEntriesFromAST(code, components)
               entries.forEach((entry) => detectedEntries.add(entry))
             } catch (error) {
@@ -166,6 +174,33 @@ async function scanFiles(
   }
 
   await scan(root)
+}
+
+function collectExcludedDirs(config: { root: string }): Set<string> {
+  const excluded = new Set<string>(FIXED_EXCLUDED_DIRS)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const cfg = config as any
+  const root = config.root
+
+  const collect = (outDir: unknown): void => {
+    if (typeof outDir !== 'string' || outDir.length === 0) return
+    const abs = path.isAbsolute(outDir) ? outDir : path.resolve(root, outDir)
+    const rel = normalizePath(path.relative(root, abs))
+    if (rel.length === 0 || rel.startsWith('..') || path.isAbsolute(rel)) return
+    excluded.add(rel)
+  }
+
+  collect(cfg.build?.outDir)
+  const environments = cfg.environments as
+    | Record<string, { build?: { outDir?: unknown } }>
+    | undefined
+  if (environments && typeof environments === 'object') {
+    for (const envName of Object.keys(environments)) {
+      collect(environments[envName]?.build?.outDir)
+    }
+  }
+
+  return excluded
 }
 
 function normalizeGlobPattern(pattern: string, root: string): string {

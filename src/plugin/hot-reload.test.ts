@@ -211,4 +211,60 @@ describe('hotReload plugin', () => {
       expect(mockServer.hot.send).not.toHaveBeenCalled()
     }
   })
+
+  /**
+   * The default entry was widened from `src/**` to `**` so users with non-src
+   * project layouts work without configuration. To prevent the wider matcher
+   * from firing on build output, common output dirs are added to the picomatch
+   * `ignore` list in addition to any user-supplied ignores.
+   */
+  describe('default entry widening with build-output ignores', () => {
+    it('matches files under app/ with the new default entry', () => {
+      const plugin = hotReload()
+      // @ts-expect-error - Testing plugin behavior with mock config
+      plugin.configResolved?.({ root: '/mock/project' })
+
+      const mockServer = { hot: { send: vi.fn() } }
+      // @ts-expect-error - Testing plugin behavior with mock context
+      plugin.handleHotUpdate?.({ server: mockServer, file: '/mock/project/app/page.tsx' })
+      expect(mockServer.hot.send).toHaveBeenCalledWith({ type: 'full-reload' })
+    })
+
+    it('ignores files under fixed-excluded dirs (dist, node_modules, etc.)', () => {
+      const plugin = hotReload()
+      // @ts-expect-error - Testing plugin behavior with mock config
+      plugin.configResolved?.({ root: '/mock/project' })
+
+      const mockServer = { hot: { send: vi.fn() } }
+      const ignored = [
+        '/mock/project/dist/index.tsx',
+        '/mock/project/build/main.ts',
+        '/mock/project/out/page.tsx',
+        '/mock/project/coverage/lcov-report.tsx',
+        '/mock/project/node_modules/pkg/index.ts',
+      ]
+      for (const file of ignored) {
+        // @ts-expect-error - Testing plugin behavior with mock context
+        plugin.handleHotUpdate?.({ server: mockServer, file })
+      }
+      expect(mockServer.hot.send).not.toHaveBeenCalled()
+    })
+
+    it('ignores files under a custom build.outDir', () => {
+      const plugin = hotReload()
+      // @ts-expect-error - Testing plugin behavior with mock config
+      plugin.configResolved?.({
+        root: '/mock/project',
+        build: { outDir: 'custom-dist' },
+      })
+
+      const mockServer = { hot: { send: vi.fn() } }
+      // @ts-expect-error - Testing plugin behavior with mock context
+      plugin.handleHotUpdate?.({
+        server: mockServer,
+        file: '/mock/project/custom-dist/foo.tsx',
+      })
+      expect(mockServer.hot.send).not.toHaveBeenCalled()
+    })
+  })
 })
