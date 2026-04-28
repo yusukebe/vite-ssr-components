@@ -206,17 +206,30 @@ interface Component {
 
 interface SSRPluginOptions {
   entry?: {
-    target?: string | string[] // File patterns to scan (default: 'src/**/*.{tsx,ts}')
+    target?: string | string[] // File patterns to scan (default: '**/*.{tsx,ts}')
     components?: Component[] // Component configurations (default: [{ name: 'Script', attribute: 'src' }, { name: 'Link', attribute: 'href' }])
   }
   hotReload?:
     | boolean
     | {
-        target?: string | string[] // File patterns to watch (default: ['src/**/*.ts', 'src/**/*.tsx'])
+        target?: string | string[] // File patterns to watch (default: ['**/*.ts', '**/*.tsx'])
         ignore?: string | string[] // File patterns to ignore
       }
 }
 ```
+
+When `target` / `entry` is omitted, both `autoEntry` and `ssrHotReload` scan
+the whole project. The following directories are excluded automatically:
+
+- **Fixed**: `node_modules`, `dist`, `build`, `out`, `coverage`, plus any
+  dotfile directories
+- **Dynamic**: `build.outDir` and every `environments[*].build.outDir`
+  configured on the resolved Vite config
+
+For `autoEntry`, files matching the pattern are also fast-skipped before
+the AST parser runs when none of the configured component names appears as
+a substring of the file — this keeps the wider default cheap on monorepos
+and large codebases.
 
 #### Examples
 
@@ -277,11 +290,12 @@ The plugin automatically scans your source files to detect Script/Link component
 
 **How it works:**
 
-1. **File Scanning**: The plugin scans files matching the specified patterns (default: `src/**/*.{tsx,ts}`)
-2. **AST Analysis**: Each file is parsed and analyzed to find JSX components
-3. **Component Detection**: Components matching the configured names are detected
-4. **Attribute Extraction**: File paths are extracted from the specified attributes
-5. **Build Configuration**: Detected files are automatically added to Vite's build input
+1. **File Scanning**: The plugin scans files matching the specified patterns (default: `**/*.{tsx,ts}`, excluding `node_modules`, `dist`, `build`, `out`, `coverage`, dotfile dirs, and any configured `build.outDir`)
+2. **Substring Prefilter**: Files that don't even mention any configured component name are skipped before the AST parser runs
+3. **AST Analysis**: Remaining files are parsed and analyzed to find JSX components
+4. **Component Detection**: Components matching the configured names are detected
+5. **Attribute Extraction**: File paths are extracted from the specified attributes
+6. **Build Configuration**: Detected files are automatically added to Vite's build input
 
 > Detected `src` / `href` values are normalized to project-relative paths, so leading-slash forms like `<Script src="/src/client.tsx" />` are accepted by both rollup and Vite 8 / rolldown.
 
