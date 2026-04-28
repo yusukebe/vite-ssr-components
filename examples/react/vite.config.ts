@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite'
 import { cloudflare } from '@cloudflare/vite-plugin'
 import react from '@vitejs/plugin-react'
-import ssrPlugin from '../../src/plugin'
+import ssrPlugin from 'vite-ssr-components/plugin'
 
 export default defineConfig({
   plugins: [

@@ -10,14 +10,15 @@
   "dependencies": {
     "hono": "^4.7.10",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "vite-ssr-components": "file:../.."
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.2.3",
     "@types/react": "^19.1.5",
     "@types/react-dom": "^19.1.5",
     "@vitejs/plugin-react": "^4.4.1",
-    "vite": "^6.3.5",
+    "vite": "^8.0.10",
     "wrangler": "^4.16.0"
   }
 }

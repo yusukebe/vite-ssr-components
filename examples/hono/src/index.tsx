@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { Script, Link, ViteClient } from '../../../src/hono'
+import { Script, Link, ViteClient } from 'vite-ssr-components/hono'
 
 const app = new Hono()
 
