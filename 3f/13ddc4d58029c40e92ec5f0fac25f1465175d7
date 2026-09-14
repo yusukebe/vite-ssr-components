@@ -1,0 +1,39 @@
+bun.lock
+  s_9ac77f93590e29::t_0c8d870e8c96ee 27,180,190-194,196,198,200,202,204,206,208,210,212,214,216,220,222,224,352-401,434,494-495,502,508-509,572,620-621,636-637,816-817,866,880-881,902,910-912,988,990,1006,1018,1034-1035,1062,1064,1066,1068,1070,1072,1102-1103,1180-1181,1186-1187,1190,1192,1194,1200,1204-1205,1208-1211,1236-1237,1308-1350
+package.json
+  s_9ac77f93590e29::t_0f6522c6c9c01d 7-8,21-25,52
+src/hono/link.tsx
+  s_9ac77f93590e29::t_d5f3dd4ccff244 4,10-12
+src/hono/script.tsx
+  s_9ac77f93590e29::t_5f1de29c9b98a0 4,9
+src/hono/vite-client.tsx
+  s_9ac77f93590e29::t_ba6a77d7d72cbb 3-5
+src/react/link.tsx
+  s_9ac77f93590e29::t_d3a0c19c2db110 7-9
+src/react/react-refresh.tsx
+  s_9ac77f93590e29::t_e398772fc01abd 3,5
+src/react/script.tsx
+  s_9ac77f93590e29::t_9ecb54e078d975 7-9
+src/react/vite-client.tsx
+  s_9ac77f93590e29::t_3225debcdd7256 3-5
+tsconfig.json
+  s_9ac77f93590e29::t_47d748ec50d765 16
+tsdown.config.ts
+  s_9ac77f93590e29::t_cde8ad8b3d06f4 1,7-12
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "3f13ddc4d58029c40e92ec5f0fac25f1465175d7",
+  "prompts": {},
+  "sessions": {
+    "s_9ac77f93590e29": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9ccf2bfe-288d-48b8-ae5d-f0c766c86184",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Yusuke Wada <yusuke@kamawada.com>"
+    }
+  }
+}
