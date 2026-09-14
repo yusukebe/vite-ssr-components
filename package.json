@@ -12,7 +12,7 @@
     "format:fix": "prettier --write 'src/**/*.{ts,tsx}'",
     "publint": "publint",
     "prerelease": "bun run build && bun vitest --run",
-    "release": "bun run np"
+    "release": "np --no-publish"
   },
   "files": [
     "dist"
