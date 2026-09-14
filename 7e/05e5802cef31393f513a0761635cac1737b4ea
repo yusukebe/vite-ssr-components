@@ -1,0 +1,21 @@
+.github/workflows/release.yml
+  s_9ac77f93590e29::t_542c2529c1ef95 1-32
+package.json
+  s_9ac77f93590e29::t_e4ef7955cf4681 15
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "7e05e5802cef31393f513a0761635cac1737b4ea",
+  "prompts": {},
+  "sessions": {
+    "s_9ac77f93590e29": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9ccf2bfe-288d-48b8-ae5d-f0c766c86184",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Yusuke Wada <yusuke@kamawada.com>"
+    }
+  }
+}
