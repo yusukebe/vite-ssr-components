@@ -1,6 +1,7 @@
 import type { Plugin } from 'vite'
 import { autoEntry } from './auto-entry.js'
 import type { EntryOptions } from './auto-entry.js'
+import { createBuildState } from './build-state.js'
 import clientFirstBuild from './client-first-build.js'
 import hotReload from './hot-reload.js'
 import injectManifest from './inject-manifest.js'
@@ -22,9 +23,10 @@ export default function ssrPlugin(options: SSRPluginOptions = {}): Plugin[] {
 
   const plugins: Plugin[] = []
 
-  plugins.push(clientFirstBuild())
+  const state = createBuildState()
+  plugins.push(clientFirstBuild(state))
   plugins.push(autoEntry(entryOption))
-  plugins.push(injectManifest())
+  plugins.push(...injectManifest(state))
 
   if (hotReloadOption) {
     const hotReloadOptions: { target?: string | string[]; ignore?: string | string[] } = {}
