@@ -1,6 +1,8 @@
 import type { BuildEnvironment, Plugin } from 'vite'
 import fs from 'node:fs'
 import path from 'node:path'
+import type { BuildState } from './build-state.js'
+import { createBuildState } from './build-state.js'
 
 /**
  * Whether the client environment has anything to build. Without an explicit
@@ -19,7 +21,7 @@ export function hasClientInput(environment: BuildEnvironment): boolean {
   return fs.existsSync(path.resolve(root, 'index.html'))
 }
 
-export default function clientFirstBuild(): Plugin {
+export default function clientFirstBuild(state: BuildState = createBuildState()): Plugin {
   return {
     name: 'client-first-build',
     config(config) {
@@ -30,13 +32,15 @@ export default function clientFirstBuild(): Plugin {
           .filter((name) => name !== 'client')
           .map((name) => builder.environments[name])
 
+        state.appBuild = true
+
         // Client build first, when there is something to build.
         // Mirrors @cloudflare/vite-plugin, which also checks the input or index.html.
         if (clientEnvironment !== undefined && hasClientInput(clientEnvironment)) {
           await builder.build(clientEnvironment)
         }
 
-        // Then worker builds
+        // Then worker builds, which inline the client manifest
         for (const workerEnv of workerEnvironments) {
           await builder.build(workerEnv)
         }
