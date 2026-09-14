@@ -1,0 +1,29 @@
+src/plugin/build-state.ts
+  s_9ac77f93590e29::t_91e9c2260f98e6 1-13
+src/plugin/client-first-build.ts
+  s_9ac77f93590e29::t_f24c85bc825cb3 4-5,24,35-36,43
+src/plugin/index.test.ts
+  s_9ac77f93590e29::t_04490fa28d7a5b 59-60
+src/plugin/index.ts
+  s_9ac77f93590e29::t_208e8d2a880e65 4,26-27,29
+src/plugin/inject-manifest.test.ts
+  s_9ac77f93590e29::t_cd3ed8d4763c58 1,5,8-28,42-50,54,60,72,88,103,121,152-215
+src/plugin/inject-manifest.ts
+  s_9ac77f93590e29::t_6c23d025a0bfbc 4-5,7-17,20-46,48,55,66-74,93-94
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "48b0d524d74df5b7ca5ce9aa8dfec5ed8aa28c96",
+  "prompts": {},
+  "sessions": {
+    "s_9ac77f93590e29": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9ccf2bfe-288d-48b8-ae5d-f0c766c86184",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Yusuke Wada <yusuke@kamawada.com>"
+    }
+  }
+}
