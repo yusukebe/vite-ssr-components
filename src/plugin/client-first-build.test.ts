@@ -83,6 +83,25 @@ describe('hasClientInput', () => {
     }
   })
 
+  it('should read rollupOptions on Vite 6 and 7, which have no rolldownOptions', () => {
+    const vite7Environment = {
+      name: 'client',
+      config: {
+        root,
+        build: { outDir: 'dist/client', rollupOptions: { input: ['src/client.tsx'] } },
+      },
+    } as unknown as BuildEnvironment
+    expect(hasClientInput(vite7Environment)).toBe(true)
+  })
+
+  it('should not throw on Vite 6 and 7 when there is no input', () => {
+    const vite7Environment = {
+      name: 'client',
+      config: { root, build: { outDir: 'dist/client', rollupOptions: {} } },
+    } as unknown as BuildEnvironment
+    expect(hasClientInput(vite7Environment)).toBe(false)
+  })
+
   it('should be false for an empty input', () => {
     expect(hasClientInput(clientEnvironment({ rolldownOptions: { input: [] } }))).toBe(false)
   })

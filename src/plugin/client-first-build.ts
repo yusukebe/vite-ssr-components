@@ -11,7 +11,12 @@ import { createBuildState } from './build-state.js'
  */
 export function hasClientInput(environment: BuildEnvironment): boolean {
   const { build, root } = environment.config
-  const input = build.rolldownOptions.input
+  // Vite 8 resolves `rolldownOptions`; Vite 6 and 7 only have `rollupOptions`.
+  const { rolldownOptions, rollupOptions } = build as {
+    rolldownOptions?: { input?: unknown }
+    rollupOptions?: { input?: unknown }
+  }
+  const input = rolldownOptions?.input ?? rollupOptions?.input
   if (typeof input === 'string' || Array.isArray(input)) {
     return input.length > 0
   }
