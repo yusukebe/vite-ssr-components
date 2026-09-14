@@ -1,0 +1,21 @@
+src/plugin/client-first-build.test.ts
+  s_9ac77f93590e29::t_95d1b9e398f438 86-104
+src/plugin/client-first-build.ts
+  s_9ac77f93590e29::t_b6f988424ee4cf 14-19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "c785b115ed9376e066bd5f360b1ebf2cb0c08102",
+  "prompts": {},
+  "sessions": {
+    "s_9ac77f93590e29": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9ccf2bfe-288d-48b8-ae5d-f0c766c86184",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Yusuke Wada <yusuke@kamawada.com>"
+    }
+  }
+}
