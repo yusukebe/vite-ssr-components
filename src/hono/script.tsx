@@ -1,11 +1,12 @@
 /** @jsxImportSource hono/jsx */
 /** @jsxRuntime automatic */
 import type { JSX } from 'hono/jsx'
+import type { JSX as JSXRuntime } from 'hono/jsx/jsx-runtime'
 import type { StringLiteralUnion } from 'hono/utils/types'
 import type { GetSrcOptions } from '../common/script.js'
 import { getSrcFromManifest } from '../common/script.js'
 
-export const Script = (props: GetSrcOptions & ScriptHTMLAttributes) => {
+export const Script = (props: GetSrcOptions & ScriptHTMLAttributes): JSXRuntime.Element => {
   const { src, manifest, prod, baseUrl, nonce, crossorigin, ...rest } = props
   const { src: scriptSrc, css: cssInScript } = getSrcFromManifest({ src, prod, manifest, baseUrl })
   return (
