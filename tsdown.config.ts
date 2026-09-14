@@ -5,6 +5,8 @@ export default defineConfig({
   format: 'esm',
   dts: true,
   exports: true,
+  // The package is ESM-only ("type": "module"), so plain .js / .d.ts are enough.
+  fixedExtension: false,
   deps: {
     neverBundle: [/^vite(\/|$)/, /^react(\/|$)/, /^hono(\/|$)/],
   },

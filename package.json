@@ -18,10 +18,10 @@
     "dist"
   ],
   "exports": {
-    "./common": "./dist/common/index.mjs",
-    "./hono": "./dist/hono/index.mjs",
-    "./plugin": "./dist/plugin/index.mjs",
-    "./react": "./dist/react/index.mjs",
+    "./common": "./dist/common/index.js",
+    "./hono": "./dist/hono/index.js",
+    "./plugin": "./dist/plugin/index.js",
+    "./react": "./dist/react/index.js",
     "./package.json": "./package.json"
   },
   "author": "Yusuke Wada <yusuke@kamawada.com> (https://github.com/yusukebe)",
