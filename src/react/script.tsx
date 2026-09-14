@@ -4,7 +4,9 @@ import type { JSX } from 'react'
 import type { GetSrcOptions } from '../common/script.js'
 import { getSrcFromManifest } from '../common/script.js'
 
-export const Script = (props: GetSrcOptions & Omit<JSX.IntrinsicElements['script'], 'src'>) => {
+export const Script = (
+  props: GetSrcOptions & Omit<JSX.IntrinsicElements['script'], 'src'>
+): JSX.Element => {
   const { src, manifest, prod, baseUrl, nonce, crossOrigin, ...rest } = props
   const { src: scriptSrc, css: cssInScript } = getSrcFromManifest({ src, prod, manifest, baseUrl })
   return (

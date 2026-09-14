@@ -1,7 +1,8 @@
 /** @jsxImportSource react */
 /** @jsxRuntime automatic */
+import type { JSX } from 'react'
 
-export const ReactRefresh = () => {
+export const ReactRefresh = (): JSX.Element => {
   // eslint-disable-next-line @typescript-eslint/prefer-optional-chain, @typescript-eslint/no-unnecessary-condition
   if (import.meta.env && import.meta.env.PROD) {
     return <></>
