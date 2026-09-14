@@ -1,0 +1,21 @@
+package.json
+  s_12128df6b5de70::t_e2f62883d474ca 21-24
+tsdown.config.ts
+  s_12128df6b5de70::t_9fe883a878a0b8 8-9
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "d7125953bd61ea9861a9529eaf8d49ad065059d7",
+  "prompts": {},
+  "sessions": {
+    "s_12128df6b5de70": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0a008a7e-7410-4eed-9308-9664eafba04f",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Yusuke Wada <yusuke@kamawada.com>"
+    }
+  }
+}
