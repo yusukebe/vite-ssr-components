@@ -77,7 +77,7 @@ That's it! The plugin automatically:
 
 ### ViteClient
 
-Adds Vite client script for development mode.
+Adds the Vite client script and the SSR hot reload script in development mode. It renders nothing in production.
 
 ```tsx
 import { ViteClient } from 'vite-ssr-components/hono'
@@ -92,7 +92,9 @@ function App() {
     </html>
   )
 }
-// Renders: <script type="module" src="/@vite/client"></script>
+// Renders:
+// <script type="module" src="/@vite/client"></script>
+// <script type="module" src="/@id/__x00__virtual:vite-ssr-components/hot-reload"></script>
 ```
 
 ### Script
@@ -214,6 +216,7 @@ interface SSRPluginOptions {
     | {
         target?: string | string[] // File patterns to watch (default: ['**/*.ts', '**/*.tsx'])
         ignore?: string | string[] // File patterns to ignore
+        morph?: boolean // Apply server-side changes to the open page instead of reloading it (default: true)
       }
 }
 ```
@@ -274,6 +277,17 @@ export default defineConfig({
   ],
 })
 
+// Reload the whole page on server-side changes instead of morphing it
+export default defineConfig({
+  plugins: [
+    ssrPlugin({
+      hotReload: {
+        morph: false,
+      },
+    }),
+  ],
+})
+
 // Disable hot reload
 export default defineConfig({
   plugins: [
@@ -283,6 +297,20 @@ export default defineConfig({
   ],
 })
 ```
+
+#### SSR Hot Reload
+
+When a watched file changes and it is not part of the client module graph, the plugin tells the browser, which fetches the current URL again and applies the new HTML to the page in place. The page is not reloaded, so the following survive an update:
+
+- Scroll position and focus
+- `<details>` and `<dialog>` the user opened
+- Text typed into inputs and textareas
+- Content rendered in the browser into an element that the server renders empty, such as `<div id="root"></div>`
+- Styles injected by Vite, and elements added by browser extensions or other scripts after the page loaded
+
+Scripts are never re-run. Files that are part of the client module graph are handled by Vite's own HMR. If the fetched page is not HTML or the request fails, the page is reloaded.
+
+Server-side modules are reloaded by Vite as usual; this plugin only updates the browser. Attributes that browser extensions add to server-rendered elements are removed on update.
 
 #### Auto-Entry Detection
 

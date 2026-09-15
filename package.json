@@ -43,6 +43,7 @@
     "@types/react": "^19.1.4",
     "@types/react-dom": "^19.1.5",
     "eslint": "^9.27.0",
+    "happy-dom": "^20",
     "hono": "^4.7.10",
     "np": "^10.2.0",
     "prettier": "^3.5.3",
