@@ -1,215 +1,121 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import hotReload from './hot-reload.js'
+import type { Plugin } from 'vite'
+import { describe, it, expect, vi } from 'vitest'
+import hotReload, { HOT_RELOAD_CLIENT_ID, hotReloadClient } from './hot-reload.js'
 
 /**
- * Tests for hotReload plugin
- * These tests verify the hot-reload functionality for SSR development
+ * Tests for the hot reload plugins.
+ * `hotUpdate` runs once per environment; only the client environment notifies the browser.
  */
-describe('hotReload plugin', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-  })
+const setup = (
+  options: Parameters<typeof hotReload>[0] = {},
+  config: object = { root: '/mock/project' }
+) => {
+  const plugin = hotReload(options)
+  // @ts-expect-error - Testing plugin behavior with mock config
+  plugin.configResolved?.(config)
+  return plugin
+}
 
+const update = (
+  plugin: Plugin,
+  {
+    file,
+    modules = [],
+    environment = 'client',
+  }: { file: string; modules?: unknown[]; environment?: string }
+) => {
+  const send = vi.fn()
+  const hook = plugin.hotUpdate as (this: unknown, options: unknown) => unknown
+  const result = hook.call({ environment: { name: environment, hot: { send } } }, { file, modules })
+  return { send, result }
+}
+
+const updateEvent = (file: string) => ({
+  type: 'custom',
+  event: 'vite-ssr-components:update',
+  data: { file },
+})
+
+describe('hotReload plugin', () => {
   it('should return a plugin with correct name', () => {
     const plugin = hotReload()
     expect(plugin.name).toBe('vite-plugin-ssr-hot-reload')
     expect(plugin.apply).toBe('serve')
     expect(plugin.configResolved).toBeDefined()
-    expect(plugin.handleHotUpdate).toBeDefined()
+    expect(plugin.hotUpdate).toBeDefined()
   })
 
-  it('should use default options when none provided', () => {
-    const plugin = hotReload()
-    expect(plugin.name).toBe('vite-plugin-ssr-hot-reload')
-  })
-
-  it('should accept custom entry patterns', () => {
-    const options = {
-      entry: ['custom/**/*.ts', 'custom/**/*.tsx'],
-    }
-    const plugin = hotReload(options)
-    expect(plugin.name).toBe('vite-plugin-ssr-hot-reload')
-  })
-
-  it('should accept custom ignore patterns', () => {
-    const options = {
-      ignore: ['**/*.test.ts', '**/*.spec.ts'],
-    }
-    const plugin = hotReload(options)
-    expect(plugin.name).toBe('vite-plugin-ssr-hot-reload')
-  })
-
-  it('should handle string entry pattern', () => {
-    const options = {
-      entry: 'src/**/*.tsx',
-    }
-    const plugin = hotReload(options)
-    expect(plugin.name).toBe('vite-plugin-ssr-hot-reload')
-  })
-
-  it('should handle string ignore pattern', () => {
-    const options = {
-      ignore: '**/*.test.ts',
-    }
-    const plugin = hotReload(options)
-    expect(plugin.name).toBe('vite-plugin-ssr-hot-reload')
+  it('should accept entry and ignore patterns as strings or arrays', () => {
+    expect(hotReload({ entry: 'src/**/*.tsx', ignore: '**/*.test.ts' }).name).toBe(
+      'vite-plugin-ssr-hot-reload'
+    )
+    expect(hotReload({ entry: ['custom/**/*.ts'], ignore: ['**/*.spec.ts'] }).name).toBe(
+      'vite-plugin-ssr-hot-reload'
+    )
   })
 
   it('should configure patterns on configResolved', () => {
-    const plugin = hotReload()
-    const mockConfig = {
-      root: '/mock/project',
-    }
-
-    expect(() => {
-      if (plugin.configResolved) {
-        // @ts-expect-error - Testing plugin behavior with mock config
-        plugin.configResolved(mockConfig)
-      }
-    }).not.toThrow()
+    expect(() => setup()).not.toThrow()
   })
 
-  it('should send full-reload for matching files', () => {
-    const plugin = hotReload()
-    const mockConfig = {
-      root: '/mock/project',
-    }
+  it('should tell the browser to apply a changed server file', () => {
+    const plugin = setup()
+    const { send, result } = update(plugin, { file: '/mock/project/src/index.tsx' })
 
-    // Configure the plugin first
-    if (plugin.configResolved) {
-      // @ts-expect-error - Testing plugin behavior with mock config
-      plugin.configResolved(mockConfig)
-    }
+    expect(send).toHaveBeenCalledWith(updateEvent('/mock/project/src/index.tsx'))
+    expect(result).toEqual([])
+  })
 
-    const mockServer = {
-      hot: {
-        send: vi.fn(),
-      },
-    }
+  it('should leave files in the client module graph to Vite', () => {
+    const plugin = setup()
+    const { send, result } = update(plugin, {
+      file: '/mock/project/src/client.tsx',
+      modules: [{ id: '/mock/project/src/client.tsx' }],
+    })
 
-    const mockContext = {
-      server: mockServer,
+    expect(send).not.toHaveBeenCalled()
+    expect(result).toBeUndefined()
+  })
+
+  it('should not interfere with server environments', () => {
+    const plugin = setup()
+    const { send, result } = update(plugin, {
       file: '/mock/project/src/index.tsx',
-    }
+      environment: 'ssr',
+    })
 
-    if (plugin.handleHotUpdate) {
-      // @ts-expect-error - Testing plugin behavior with mock context
-      const result = plugin.handleHotUpdate(mockContext)
-
-      expect(mockServer.hot.send).toHaveBeenCalledWith({ type: 'full-reload' })
-      expect(result).toEqual([])
-    }
+    expect(send).not.toHaveBeenCalled()
+    expect(result).toBeUndefined()
   })
 
-  it('should not send reload for non-matching files', () => {
-    const plugin = hotReload()
-    const mockConfig = {
-      root: '/mock/project',
-    }
+  it('should not notify for non-matching files', () => {
+    const plugin = setup()
+    const { send, result } = update(plugin, { file: '/mock/project/public/image.png' })
 
-    // Configure the plugin first
-    if (plugin.configResolved) {
-      // @ts-expect-error - Testing plugin behavior with mock config
-      plugin.configResolved(mockConfig)
-    }
-
-    const mockServer = {
-      hot: {
-        send: vi.fn(),
-      },
-    }
-
-    const mockContext = {
-      server: mockServer,
-      file: '/mock/project/public/image.png',
-    }
-
-    if (plugin.handleHotUpdate) {
-      // @ts-expect-error - Testing plugin behavior with mock context
-      plugin.handleHotUpdate(mockContext)
-
-      expect(mockServer.hot.send).not.toHaveBeenCalled()
-    }
+    expect(send).not.toHaveBeenCalled()
+    expect(result).toBeUndefined()
   })
 
-  it('should handle missing file gracefully', () => {
-    const plugin = hotReload()
-    const mockConfig = {
-      root: '/mock/project',
-    }
+  it('should fully reload when morph is disabled', () => {
+    const plugin = setup({ morph: false })
+    const serverFile = update(plugin, { file: '/mock/project/src/index.tsx' })
+    const clientFile = update(plugin, {
+      file: '/mock/project/src/client.tsx',
+      modules: [{ id: '/mock/project/src/client.tsx' }],
+    })
 
-    // Configure the plugin first
-    if (plugin.configResolved) {
-      // @ts-expect-error - Testing plugin behavior with mock config
-      plugin.configResolved(mockConfig)
-    }
-
-    const mockServer = {
-      hot: {
-        send: vi.fn(),
-      },
-    }
-
-    const mockContext = {
-      server: mockServer,
-      file: undefined,
-    }
-
-    expect(() => {
-      if (plugin.handleHotUpdate) {
-        // @ts-expect-error - Testing plugin behavior with mock context
-        plugin.handleHotUpdate(mockContext)
-      }
-    }).not.toThrow()
-
-    expect(mockServer.hot.send).not.toHaveBeenCalled()
+    expect(serverFile.send).toHaveBeenCalledWith({ type: 'full-reload' })
+    expect(serverFile.result).toEqual([])
+    expect(clientFile.send).toHaveBeenCalledWith({ type: 'full-reload' })
   })
 
   it('should handle custom entry patterns correctly', () => {
-    const plugin = hotReload({
-      entry: ['custom/**/*.ts'],
-    })
-    const mockConfig = {
-      root: '/mock/project',
-    }
+    const plugin = setup({ entry: ['custom/**/*.ts'] })
 
-    // Configure the plugin first
-    if (plugin.configResolved) {
-      // @ts-expect-error - Testing plugin behavior with mock config
-      plugin.configResolved(mockConfig)
-    }
-
-    const mockServer = {
-      hot: {
-        send: vi.fn(),
-      },
-    }
-
-    // Should match custom pattern
-    const mockContext1 = {
-      server: mockServer,
-      file: '/mock/project/custom/module.ts',
-    }
-
-    if (plugin.handleHotUpdate) {
-      // @ts-expect-error - Testing plugin behavior with mock context
-      const result = plugin.handleHotUpdate(mockContext1)
-      expect(mockServer.hot.send).toHaveBeenCalledWith({ type: 'full-reload' })
-      expect(result).toEqual([])
-    }
-
-    // Should not match default pattern
-    mockServer.hot.send.mockClear()
-    const mockContext2 = {
-      server: mockServer,
-      file: '/mock/project/src/index.tsx',
-    }
-
-    if (plugin.handleHotUpdate) {
-      // @ts-expect-error - Testing plugin behavior with mock context
-      plugin.handleHotUpdate(mockContext2)
-      expect(mockServer.hot.send).not.toHaveBeenCalled()
-    }
+    expect(update(plugin, { file: '/mock/project/custom/module.ts' }).send).toHaveBeenCalledWith(
+      updateEvent('/mock/project/custom/module.ts')
+    )
+    expect(update(plugin, { file: '/mock/project/src/index.tsx' }).send).not.toHaveBeenCalled()
   })
 
   /**
@@ -220,22 +126,14 @@ describe('hotReload plugin', () => {
    */
   describe('default entry widening with build-output ignores', () => {
     it('matches files under app/ with the new default entry', () => {
-      const plugin = hotReload()
-      // @ts-expect-error - Testing plugin behavior with mock config
-      plugin.configResolved?.({ root: '/mock/project' })
-
-      const mockServer = { hot: { send: vi.fn() } }
-      // @ts-expect-error - Testing plugin behavior with mock context
-      plugin.handleHotUpdate?.({ server: mockServer, file: '/mock/project/app/page.tsx' })
-      expect(mockServer.hot.send).toHaveBeenCalledWith({ type: 'full-reload' })
+      const plugin = setup()
+      expect(update(plugin, { file: '/mock/project/app/page.tsx' }).send).toHaveBeenCalledWith(
+        updateEvent('/mock/project/app/page.tsx')
+      )
     })
 
     it('ignores files under fixed-excluded dirs (dist, node_modules, etc.)', () => {
-      const plugin = hotReload()
-      // @ts-expect-error - Testing plugin behavior with mock config
-      plugin.configResolved?.({ root: '/mock/project' })
-
-      const mockServer = { hot: { send: vi.fn() } }
+      const plugin = setup()
       const ignored = [
         '/mock/project/dist/index.tsx',
         '/mock/project/build/main.ts',
@@ -244,27 +142,44 @@ describe('hotReload plugin', () => {
         '/mock/project/node_modules/pkg/index.ts',
       ]
       for (const file of ignored) {
-        // @ts-expect-error - Testing plugin behavior with mock context
-        plugin.handleHotUpdate?.({ server: mockServer, file })
+        expect(update(plugin, { file }).send).not.toHaveBeenCalled()
       }
-      expect(mockServer.hot.send).not.toHaveBeenCalled()
     })
 
     it('ignores files under a custom build.outDir', () => {
-      const plugin = hotReload()
-      // @ts-expect-error - Testing plugin behavior with mock config
-      plugin.configResolved?.({
-        root: '/mock/project',
-        build: { outDir: 'custom-dist' },
-      })
-
-      const mockServer = { hot: { send: vi.fn() } }
-      // @ts-expect-error - Testing plugin behavior with mock context
-      plugin.handleHotUpdate?.({
-        server: mockServer,
-        file: '/mock/project/custom-dist/foo.tsx',
-      })
-      expect(mockServer.hot.send).not.toHaveBeenCalled()
+      const plugin = setup({}, { root: '/mock/project', build: { outDir: 'custom-dist' } })
+      expect(
+        update(plugin, { file: '/mock/project/custom-dist/foo.tsx' }).send
+      ).not.toHaveBeenCalled()
     })
+  })
+})
+
+describe('hotReloadClient plugin', () => {
+  const resolve = (plugin: Plugin, id: string) =>
+    (plugin.resolveId as (this: unknown, id: string) => unknown).call({}, id)
+  const load = (plugin: Plugin, id: string) =>
+    (plugin.load as (this: unknown, id: string) => unknown).call({}, id)
+
+  it('should resolve and load the browser module', () => {
+    const plugin = hotReloadClient({ enabled: true })
+    const resolved = resolve(plugin, HOT_RELOAD_CLIENT_ID)
+
+    expect(plugin.apply).toBe('serve')
+    expect(resolved).toBe(`\0${HOT_RELOAD_CLIENT_ID}`)
+    expect(load(plugin, resolved as string)).toContain('setupHotReload(import.meta.hot)')
+  })
+
+  it('should serve an empty module when disabled', () => {
+    const plugin = hotReloadClient({ enabled: false })
+    const resolved = resolve(plugin, HOT_RELOAD_CLIENT_ID) as string
+
+    expect(load(plugin, resolved)).toBe('export {}\n')
+  })
+
+  it('should ignore other modules', () => {
+    const plugin = hotReloadClient({ enabled: true })
+    expect(resolve(plugin, '/src/index.tsx')).toBeUndefined()
+    expect(load(plugin, '/src/index.tsx')).toBeUndefined()
   })
 })

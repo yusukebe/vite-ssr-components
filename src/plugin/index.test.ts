@@ -56,8 +56,16 @@ describe('ssrPlugin', () => {
     const pluginsWithHotReload = ssrPlugin({ hotReload: true })
     const pluginsWithoutHotReload = ssrPlugin({ hotReload: false })
 
-    expect(pluginsWithHotReload.length).toBe(5)
-    expect(pluginsWithoutHotReload.length).toBe(4)
+    expect(pluginsWithHotReload.length).toBe(6)
+    expect(pluginsWithoutHotReload.length).toBe(5)
+  })
+
+  it('should always serve the hot reload client module, which ViteClient loads', () => {
+    for (const hotReload of [true, false, { morph: false }]) {
+      const plugins = ssrPlugin({ hotReload })
+      const clientPlugin = plugins.find((p) => p.name === 'vite-plugin-ssr-hot-reload-client')
+      expect(clientPlugin).toBeDefined()
+    }
   })
 
   it('should pass hot-reload options', () => {

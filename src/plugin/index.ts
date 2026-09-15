@@ -3,7 +3,7 @@ import { autoEntry } from './auto-entry.js'
 import type { EntryOptions } from './auto-entry.js'
 import { createBuildState } from './build-state.js'
 import clientFirstBuild from './client-first-build.js'
-import hotReload from './hot-reload.js'
+import hotReload, { hotReloadClient } from './hot-reload.js'
 import injectManifest from './inject-manifest.js'
 
 type HotReloadOptions =
@@ -11,6 +11,8 @@ type HotReloadOptions =
   | {
       target?: string | string[]
       ignore?: string | string[]
+      /** Apply server-side changes to the open page instead of reloading it. Defaults to true. */
+      morph?: boolean
     }
 
 interface SSRPluginOptions {
@@ -28,8 +30,15 @@ export default function ssrPlugin(options: SSRPluginOptions = {}): Plugin[] {
   plugins.push(autoEntry(entryOption))
   plugins.push(...injectManifest(state))
 
+  const morph = typeof hotReloadOption === 'object' ? (hotReloadOption.morph ?? true) : true
+  plugins.push(hotReloadClient({ enabled: hotReloadOption !== false && morph }))
+
   if (hotReloadOption) {
-    const hotReloadOptions: { target?: string | string[]; ignore?: string | string[] } = {}
+    const hotReloadOptions: {
+      target?: string | string[]
+      ignore?: string | string[]
+      morph?: boolean
+    } = { morph }
 
     if (typeof hotReloadOption === 'object') {
       if (hotReloadOption.target) {

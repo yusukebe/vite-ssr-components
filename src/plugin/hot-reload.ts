@@ -2,6 +2,29 @@ import picomatch from 'picomatch'
 import type { Plugin } from 'vite'
 import { normalizePath } from 'vite'
 import path from 'node:path'
+import { createClientCode } from './hot-reload-client.js'
+
+/** The browser module that applies server-side updates. `ViteClient` loads it in development. */
+export const HOT_RELOAD_CLIENT_ID = 'virtual:vite-ssr-components/hot-reload'
+const RESOLVED_HOT_RELOAD_CLIENT_ID = `\0${HOT_RELOAD_CLIENT_ID}`
+
+/** Serves the browser module. It is empty when hot reload by morphing is disabled, so `ViteClient` can always load it. */
+export function hotReloadClient(options: { enabled: boolean }): Plugin {
+  return {
+    name: 'vite-plugin-ssr-hot-reload-client',
+    apply: 'serve',
+    resolveId(id) {
+      if (id === HOT_RELOAD_CLIENT_ID) {
+        return RESOLVED_HOT_RELOAD_CLIENT_ID
+      }
+    },
+    load(id) {
+      if (id === RESOLVED_HOT_RELOAD_CLIENT_ID) {
+        return options.enabled ? createClientCode() : 'export {}\n'
+      }
+    },
+  }
+}
 
 interface Options {
   /**
@@ -9,6 +32,11 @@ interface Options {
    */
   entry?: string | string[]
   ignore?: string | string[]
+  /**
+   * Apply server-side changes to the open page instead of reloading it.
+   * default true
+   */
+  morph?: boolean
 }
 
 const FIXED_EXCLUDED_DIRS = ['node_modules', 'dist', 'build', 'out', 'coverage']
@@ -25,6 +53,8 @@ export default function ssrHotReload(options: Options = {}): Plugin {
     : options.ignore
       ? [options.ignore]
       : []
+
+  const morph = options.morph ?? true
 
   let root = process.cwd()
   let isMatch: (file: string) => boolean
@@ -56,15 +86,28 @@ export default function ssrHotReload(options: Options = {}): Plugin {
       }
     },
 
-    handleHotUpdate({ server, file }) {
-      if (!file) {
+    hotUpdate({ file, modules }) {
+      // Only the browser is notified here; server environments reload their modules as usual
+      if (this.environment.name !== 'client' || !isMatch(file)) {
         return
       }
 
-      if (isMatch(file)) {
-        server.hot.send({ type: 'full-reload' })
+      if (!morph) {
+        this.environment.hot.send({ type: 'full-reload' })
         return []
       }
+
+      // Part of the client module graph: Vite's own HMR handles it
+      if (modules.length > 0) {
+        return
+      }
+
+      this.environment.hot.send({
+        type: 'custom',
+        event: 'vite-ssr-components:update',
+        data: { file },
+      })
+      return []
     },
   }
 
