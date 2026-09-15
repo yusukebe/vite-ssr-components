@@ -1,0 +1,39 @@
+README.md
+  s_9ac77f93590e29::t_7d320ea13b5bc7 80,95-97,219,280-290,301-314
+bun.lock
+  s_9ac77f93590e29::t_59b04593dd027e 21,289-292,437-438,519-520,621-622,1053-1054,1067-1068
+package.json
+  s_9ac77f93590e29::t_6155552339e436 46
+src/hono/vite-client.tsx
+  s_9ac77f93590e29::t_0bf84416d13c8e 5-7,13-18
+src/plugin/hot-reload-client.test.ts
+  s_9ac77f93590e29::t_33967e735d7d71 1-231
+src/plugin/hot-reload-client.ts
+  s_9ac77f93590e29::t_0425540941db1d 1-177
+src/plugin/hot-reload.test.ts
+  s_9ac77f93590e29::t_5f122106df9d2f 1-3,6-7,9-37,39,45,48-54,57-58,61-63,65-66,69-74,76-77,80-82,84-85,87-88,91-93,95-96,99-105,107-109,113,115-118,129-132,136,145,150-153,157-185
+src/plugin/hot-reload.ts
+  s_9ac77f93590e29::t_cb8378c7237b93 5-27,35-39,57-58,89-91,95-96,99-110
+src/plugin/index.test.ts
+  s_9ac77f93590e29::t_347be81e5b7487 59-68
+src/plugin/index.ts
+  s_9ac77f93590e29::t_d0d6d5d58f3e39 6,14-15,33-35,37-41
+src/react/vite-client.tsx
+  s_9ac77f93590e29::t_74a1d78778462d 5-7,13-18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "078949a169f6688a9177986505e36094b89d1bd3",
+  "prompts": {},
+  "sessions": {
+    "s_9ac77f93590e29": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9ccf2bfe-288d-48b8-ae5d-f0c766c86184",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Yusuke Wada <yusuke@kamawada.com>"
+    }
+  }
+}
