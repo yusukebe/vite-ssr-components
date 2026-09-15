@@ -60,6 +60,6 @@
   "dependencies": {
     "@babel/parser": "^7.27.2",
     "@babel/traverse": "^7.27.1",
-    "picomatch": "^4.0.2"
+    "picomatch": "^4.0.7"
   }
 }
