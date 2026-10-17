@@ -22,6 +22,7 @@
     "./hono": "./dist/hono/index.js",
     "./plugin": "./dist/plugin/index.js",
     "./react": "./dist/react/index.js",
+    "./solid": "./dist/solid/index.js",
     "./package.json": "./package.json"
   },
   "author": "Yusuke Wada <yusuke@kamawada.com> (https://github.com/yusukebe)",
@@ -50,6 +51,7 @@
     "publint": "^0.3.12",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "solid-js": "^1.9.17",
     "tsdown": "^0.23.0",
     "vite": "^8.0.10",
     "vitest": "^3.1.4"
