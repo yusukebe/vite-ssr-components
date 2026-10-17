@@ -82,6 +82,7 @@ Adds the Vite client script and the SSR hot reload script in development mode. I
 ```tsx
 import { ViteClient } from 'vite-ssr-components/hono'
 // import { ViteClient } from 'vite-ssr-components/react'
+// import { ViteClient } from 'vite-ssr-components/solid'
 
 function App() {
   return (
@@ -104,6 +105,7 @@ Adds script tags with proper Vite handling. In production mode, automatically re
 ```tsx
 import { Script } from 'vite-ssr-components/hono'
 // import { Script } from 'vite-ssr-components/react'
+// import { Script } from 'vite-ssr-components/solid'
 
 function App() {
   return (
@@ -137,6 +139,7 @@ Adds link tags for stylesheets and other resources. In production mode, automati
 ```tsx
 import { Link } from 'vite-ssr-components/hono'
 // import { Link } from 'vite-ssr-components/react'
+// import { Link } from 'vite-ssr-components/solid'
 
 function App() {
   return (
@@ -562,6 +565,63 @@ app.get('/', async (c) => {
     )
   )
 })
+```
+
+### Solid
+
+#### Directory Structure
+
+```
+examples/solid/
+├── src/
+│   ├── index.tsx      # Server entry point
+│   ├── client.tsx     # Client entry point
+│   └── style.css      # Stylesheet
+├── vite.config.ts     # Vite configuration
+└── package.json
+```
+
+#### vite.config.ts
+
+```ts
+import { defineConfig } from 'vite'
+import { cloudflare } from '@cloudflare/vite-plugin'
+import solidPlugin from 'vite-plugin-solid'
+import ssrPlugin from 'vite-ssr-components/plugin'
+
+export default defineConfig({
+  plugins: [cloudflare(), ssrPlugin(), solidPlugin({ ssr: true })],
+})
+```
+
+#### Server Code
+
+```tsx
+import { Hono } from 'hono'
+import { Script, Link, ViteClient } from 'vite-ssr-components/solid'
+import { renderToString } from 'solid-js/web'
+
+const app = new Hono()
+
+app.get('/', (c) => {
+  return c.html(
+    '<!DOCTYPE html>' +
+      renderToString(() => (
+        <html>
+          <head>
+            <ViteClient />
+            <Script src='/src/client.tsx' />
+            <Link href='/src/style.css' rel='stylesheet' />
+          </head>
+          <body>
+            <div id='root' />
+          </body>
+        </html>
+      ))
+  )
+})
+
+export default app
 ```
 
 ## Author

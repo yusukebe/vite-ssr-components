@@ -1,0 +1,6 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "vite-ssr-components-examples-solid",
+  "compatibility_date": "2025-04-01",
+  "main": "./src/index.tsx",
+}
