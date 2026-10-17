@@ -1,4 +1,5 @@
 import { defineConfig } from 'tsdown'
+import solid from 'unplugin-solid/rolldown'
 
 export default defineConfig({
   entry: ['src/common/index.ts', 'src/react/index.ts', 'src/hono/index.ts', 'src/solid/index.ts', 'src/plugin/index.ts'],
@@ -12,4 +13,5 @@ export default defineConfig({
   },
   clean: false,
   target: false,
+  plugins: [solid({ include: ['src/solid/**'] })],
 })

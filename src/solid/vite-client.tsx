@@ -1,5 +1,4 @@
 /** @jsxImportSource solid-js */
-/** @jsxRuntime automatic */
 import type { JSX } from 'solid-js'
 
 // The virtual module served by the plugin; Vite exposes `\0`-prefixed ids under /@id/__x00__

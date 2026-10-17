@@ -1,5 +1,4 @@
 /** @jsxImportSource solid-js */
-/** @jsxRuntime automatic */
 import { renderToString } from 'solid-js/web'
 import { describe, it, expect } from 'vitest'
 import { Script } from './script.js'

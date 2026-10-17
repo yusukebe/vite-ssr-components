@@ -1,5 +1,4 @@
 /** @jsxImportSource solid-js */
-/** @jsxRuntime automatic */
 import type { JSX } from 'solid-js'
 import type { GetSrcOptions } from '../common/script.js'
 import { getSrcFromManifest } from '../common/script.js'
