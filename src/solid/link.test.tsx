@@ -18,12 +18,14 @@ describe('Solid - Link', () => {
         media='all'
       />
     ))
-    expect(html).toContain('<link href="/assets/style.12345.css" rel="stylesheet" media="all"')
+    expect(html).toContain('<link ')
+    expect(html).toContain('href="/assets/style.12345.css" rel="stylesheet" media="all"')
   })
 
   it('renders <link> with original href in dev mode', () => {
     const html = renderToString(() => <Link href='/dev.css' prod={false} rel='stylesheet' />)
-    expect(html).toContain('<link href="/dev.css" rel="stylesheet"')
+    expect(html).toContain('<link ')
+    expect(html).toContain('href="/dev.css" rel="stylesheet"')
   })
 
   it('handles custom baseUrl in production mode', () => {
@@ -39,7 +41,8 @@ describe('Solid - Link', () => {
         rel='stylesheet'
       />
     ))
-    expect(html).toContain('<link href="/custom/assets/style.12345.css" rel="stylesheet"')
+    expect(html).toContain('<link ')
+    expect(html).toContain('href="/custom/assets/style.12345.css" rel="stylesheet"')
   })
 
   it('passes through additional props to the link element', () => {
@@ -49,7 +52,7 @@ describe('Solid - Link', () => {
         prod={false}
         rel='stylesheet'
         id='main-style'
-        crossOrigin='anonymous'
+        crossorigin='anonymous'
         data-testid='link-tag'
       />
     ))

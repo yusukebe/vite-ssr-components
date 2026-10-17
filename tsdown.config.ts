@@ -13,5 +13,5 @@ export default defineConfig({
   },
   clean: false,
   target: false,
-  plugins: [solid({ include: ['src/solid/**'] })],
+  plugins: [solid({ include: ['src/solid/**'], ssr: true })],
 })

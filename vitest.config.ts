@@ -5,5 +5,5 @@ export default defineConfig({
   test: {
     globals: true
   },
-  plugins: [solid({ include: ['src/solid/**'] })],
+  plugins: [solid({ include: ['src/solid/**'], ssr: true })],
 })

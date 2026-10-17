@@ -34,8 +34,8 @@ describe('Solid - Script', () => {
       <Script src='/dev.js' prod={false} id='main-script' async defer data-testid='script-tag' />
     ))
     expect(html).toContain('id="main-script"')
-    expect(html).toContain('async=""')
-    expect(html).toContain('defer=""')
+    expect(html).toContain('async ')
+    expect(html).toContain('defer ')
     expect(html).toContain('data-testid="script-tag"')
   })
 
@@ -53,13 +53,14 @@ describe('Solid - Script', () => {
         manifest={manifest}
         prod={true}
         baseUrl='/'
-        crossOrigin='anonymous'
+        crossorigin='anonymous'
         nonce='abc123xyz789'
       />
     ))
     expect(html).toContain('src="/assets/main.12345.js"')
+    expect(html).toContain('<link ')
     expect(html).toContain(
-      '<link rel="stylesheet" crossorigin="anonymous" nonce="abc123xyz789" href="/assets/main-abcde.css"/>'
+      'rel="stylesheet" crossorigin="anonymous" nonce="abc123xyz789" href="/assets/main-abcde.css"'
     )
   })
 })
