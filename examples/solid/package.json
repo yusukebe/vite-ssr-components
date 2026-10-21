@@ -1,0 +1,21 @@
+{
+  "name": "vite-ssr-components-examples-solid",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "$npm_execpath run build && vite preview",
+    "deploy": "$npm_execpath run build && wrangler deploy"
+  },
+  "dependencies": {
+    "hono": "^4.7.10",
+    "solid-js": "^1.9.17",
+    "vite-ssr-components": "file:../.."
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.2.3",
+    "vite": "^8.0.10",
+    "vite-plugin-solid": "^2.11.14",
+    "wrangler": "^4.16.0"
+  }
+}
