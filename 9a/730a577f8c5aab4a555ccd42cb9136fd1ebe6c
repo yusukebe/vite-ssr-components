@@ -1,0 +1,19 @@
+bun.lock
+  s_5603fede9dc523::t_8f93707d6641f2 459,467,479,547,829,911,999,1001,1193-1196,1297
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "9a730a577f8c5aab4a555ccd42cb9136fd1ebe6c",
+  "prompts": {},
+  "sessions": {
+    "s_5603fede9dc523": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ecda2587-bfdd-4cc6-b0f4-5ad16b6d3992",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Yusuke Wada <yusuke@kamawada.com>"
+    }
+  }
+}
